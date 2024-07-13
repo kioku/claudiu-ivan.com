@@ -1,0 +1,33 @@
+:root, ::backdrop {
+  --padding-tb: 128px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root, ::backdrop {
+    --text: #3a3a3a;
+    --text-deep: #1a1a1a;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root, ::backdrop {
+    --accent: #ababab;
+    --text-deep: #bbb;
+  }
+}
+
+a, a:visited {
+  color: var(--text-deep);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(125, 125, 125, 0.3);
+  transition: border .3s ease-in-out;
+}
+
+a:hover {
+  /* color: var(--accent); */
+  border-bottom-color: var(--text-deep);
+}
+
+main {
+  padding: var(--padding-tb) 0;
+}

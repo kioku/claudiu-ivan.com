@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="description" content="{{ config.description }}" />
+    <meta name="author" content="{{ config.author }}" />
+
+    <link rel="me" href="https://github.com/kioku" />
+    <link rel="me" href="https://x.com/claudiuivan" />
+    <link rel="me" href="mailto:claudiu.ivan@me.com" />
+    <link rel="me" href="mailto:contact@claudiu-ivan.com" />
+
+    <meta property="og:title" content="{{ config.title }}" />
+    <meta name="twitter:title" content="{{ config.title }}" />
+
+    {#- favicons #}
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+
+    {%- if config.generate_feeds %} {%- for feed in config.feed_filenames %} {%-
+    if feed is containing('atom') %}
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      title="{{ config.title }} Atom Feed"
+      href="{{ get_url(path=feed, trailing_slash=false, lang=lang) | safe }}"
+    />
+    {%- endif %} {%- if feed is containing('rss') %}
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="{{ config.title }} RSS Feed"
+      href="{{ get_url(path=feed, trailing_slash=false, lang=lang) | safe }}"
+    />
+    {%- endif %} {%- endfor %} {%- endif %}
+
+    <title>{{ config.title }}</title>
+
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <main class="section">
+      <div class="container">{% block content %} {% endblock %}</div>
+    </main>
+    <!-- <footer>
+      <p>Copyright &copy; 2024 Claudiu Ivan</p>
+    </footer> -->
+    <script
+      data-goatcounter="https://kioku.goatcounter.com/count"
+      async
+      src="//gc.zgo.at/count.js"
+    ></script>
+  </body>
+</html>
