@@ -4,7 +4,8 @@ base_url = "https://claudiu-ivan.com"
 generate_feeds = true
 feed_filenames = ["atom.xml", "rss.xml"]
 title = "Claudiu Ivan"
-description = "A software engineer from Romania. I'm into building things."
+description = "Claudiu Ivan develops software solutions that empower users and provide tangible value."
+# "Claudiu Ivan builds software solutions that empower users and deliver real value"
 
 minify_html = true
 
