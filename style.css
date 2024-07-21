@@ -1,0 +1,68 @@
+:root, ::backdrop {
+  --padding-tb: 128px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root, ::backdrop {
+    --text: #3a3a3a;
+    --text-deep: #1a1a1a;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root, ::backdrop {
+    --accent: #ababab;
+    --text-deep: #bbb;
+  }
+}
+
+@media only screen and (max-width: 768px) {
+  :root, ::backdrop {
+    --padding-tb: 64px;
+  }
+}
+
+a, a:visited {
+  color: var(--text-deep);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(125, 125, 125, 0.3);
+  transition: .3s ease-in-out;
+}
+
+a:hover {
+  /* color: var(--accent); */
+  border-bottom-color: var(--text-deep);
+}
+
+main {
+  padding: var(--padding-tb) 0;
+}
+
+nav {
+  text-align: right;
+  height: 28px;
+  padding: calc(var(--padding-tb) / 4) 0;
+}
+
+nav a {
+  margin-right: 16px;
+}
+
+ul.blog-list {
+  list-style: none;
+}
+
+ul.blog-list a {
+  border-bottom: none;
+  color: rgba(125, 125, 125, 1);
+}
+
+ul.blog-list a:hover {
+  color: var(--text-deep);
+}
+
+.blog-date {
+  font-size: 0.8em;
+  opacity: 0.5;
+  margin-left: 40px;
+}
