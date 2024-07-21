@@ -5,7 +5,6 @@ generate_feeds = true
 feed_filenames = ["atom.xml", "rss.xml"]
 title = "Claudiu Ivan"
 description = "Claudiu Ivan develops software solutions that empower users and provide tangible value."
-# "Claudiu Ivan builds software solutions that empower users and deliver real value"
 
 minify_html = true
 
