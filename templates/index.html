@@ -1,29 +1,27 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <h4>{{ config.author }}</h4>
-<p>Hey, I'm a software engineer.</p>
+<p>
+    Hey, I'm a software engineer dedicated to creating tools that meet user
+    needs and enhance efficiency.
+</p>
 
 <p>
-  In my professional life, I'm driven to create tools that address user needs and improve efficiency.
-  I value open-source technology and rely on it as a fundamental part of my work.
+    Beyond programming, I love reading, enjoying a good cup of tea, and
+    immersing myself in music. To stay sharp and healthy, I snowboard when
+    possible and engage in water sports during warmer months.
 </p>
+
 <p>
-  Aside from programming, I enjoy reading, savoring a good cup of tea, and immersing myself in music.
-  To maintain a sharp mind and physical well-being, I snowboard during the winter months and take to the water when the weather is warmer.
+    You can find me at <a href="https://x.com/claudiuivan">@claudiuivan</a>, or
+    <a href="mailto:claudiu.ivan@me.com">claudiu.ivan@me.com</a>.
 </p>
 
-<p>You can find me at <a href="https://x.com/claudiuivan">@claudiuivan</a>,
-  or <a href="mailto:claudiu.ivan@me.com">claudiu.ivan@me.com</a>.
-</p>
-
-  <!-- <a href="https://x.com/claudiuivan">
+<!-- <a href="https://x.com/claudiuivan">
     <img src="{{ get_url(path='x.svg') }}" alt="X" width="18" height="18">
   </a>,
   <a href="https://github.com/kioku">
     <img src="{{ get_url(path='github.svg') }}" alt="GitHub" width="18" height="18">
   </a>, -->
-
 
 <!-- <p>Click <a href="{{ get_url(path='@/writing/_index.md') }}">here</a> to see my posts.</p> -->
 {% endblock content %}
