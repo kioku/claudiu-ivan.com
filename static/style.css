@@ -61,6 +61,10 @@ ul.blog-list {
   padding: 0;
 }
 
+ul.blog-list li {
+  margin-bottom: 8px;
+}
+
 ul.blog-list a {
   border-bottom: none;
   color: rgba(125, 125, 125, 1);
