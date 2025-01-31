@@ -1,28 +1,36 @@
-:root, ::backdrop {
+:root,
+::backdrop {
   --padding-tb: 128px;
 }
 
 @media (prefers-color-scheme: light) {
-  :root, ::backdrop {
+
+  :root,
+  ::backdrop {
     --text: #3a3a3a;
     --text-deep: #1a1a1a;
   }
 }
 
 @media (prefers-color-scheme: dark) {
-  :root, ::backdrop {
+
+  :root,
+  ::backdrop {
     --accent: #ababab;
     --text-deep: #bbb;
   }
 }
 
 @media only screen and (max-width: 768px) {
-  :root, ::backdrop {
+
+  :root,
+  ::backdrop {
     --padding-tb: 64px;
   }
 }
 
-a, a:visited {
+a,
+a:visited {
   color: var(--text-deep);
   text-decoration: none;
   border-bottom: 1px solid rgba(125, 125, 125, 0.3);
@@ -50,11 +58,15 @@ nav a {
 
 ul.blog-list {
   list-style: none;
+  padding: 0;
 }
 
 ul.blog-list a {
   border-bottom: none;
   color: rgba(125, 125, 125, 1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 ul.blog-list a:hover {
@@ -65,4 +77,39 @@ ul.blog-list a:hover {
   font-size: 0.8em;
   opacity: 0.5;
   margin-left: 40px;
+}
+
+pre {
+  padding: 1rem;
+  overflow: auto;
+  font-size: 0.9rem;
+  border: 0;
+  border-radius: 0;
+}
+
+/* The line numbers already provide some kind of left/right padding */
+pre[data-linenos] {
+  padding: 1rem 0;
+}
+
+pre table td {
+  padding: 0;
+}
+
+/* The line number cells */
+pre table td:nth-of-type(1) {
+  text-align: center;
+  user-select: none;
+}
+
+pre mark {
+  /* If you want your highlights to take the full width */
+  display: block;
+  /* The default background colour of a mark is bright yellow */
+  background-color: rgba(254, 252, 232, 0.9);
+}
+
+pre table {
+  width: 100%;
+  border-collapse: collapse;
 }

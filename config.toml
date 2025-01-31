@@ -19,7 +19,11 @@ build_search_index = false
 [markdown]
 # Whether to do syntax highlighting
 # Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
-highlight_code = false
+highlight_code = true
+
+# The theme to use for code highlighting.
+# See below for list of allowed values.
+highlight_theme = "gruvbox-dark"
 
 [extra]
 # Put all your custom variables here
