@@ -125,7 +125,7 @@ const many = <T>(parser: Parser<T>): Parser<T[]> => (input: string) => {
     if (remaining === '') break;
   }
 
-  return success([results, remaining]);
+  return success<[T[], string]>([results, remaining]);
 };
 
 const label = (): Parser<string> => (input: string) => {
@@ -355,7 +355,7 @@ function generateTestIssues(count: number): Issue[] {
   }));
 }
 
-const issues = generateTestIssues(1_000_000);
+const issues = generateTestIssues(100_000);
 const searchIndex = buildIndex([]);
 
 // Example usage:
@@ -419,7 +419,7 @@ testQueries.forEach(query => {
     createSearchPredicate(searchQueryParser(query)),
     issues
   );
-  //showSearchStats(query, issues, results, startTime);
+  showSearchStats(query, issues, results, startTime);
 });
 
 //Improvements:
