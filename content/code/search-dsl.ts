@@ -4,21 +4,9 @@
 // Core Types
 // ======================
 
-type DocumentTypeLocal = 'document' | 'folder';
-type PriorityLevel = 'low' | 'medium' | 'high';
-type TimeFilter = 'hour' | 'day' | 'week' | 'month';
-
-interface DocumentLocal {
-  id: string;
-  content: string;
-  type: DocumentTypeLocal;
-  createdAt: number;
-  priority?: PriorityLevel;
-  clientIds?: number[];
-}
-
 type IssueStatus = 'open' | 'closed';
 type IssueType = 'bug' | 'feature' | 'docs' | 'enhancement';
+type TimeFilter = 'hour' | 'day' | 'week' | 'month';
 
 interface Issue {
   id: string;
@@ -57,13 +45,13 @@ const failure = <E>(error: E) => new Left(error);
 // Parser Implementation
 // ======================
 
-type ParseError = {
+type ParserError = {
   code: 'INVALID_TOKEN' | 'MISSING_VALUE' | 'TYPE_MISMATCH';
   position: number;
   input: string;
 };
 
-type ParserResult<T> = Either<ParseError, [T, string]>;
+type ParserResult<T> = Either<ParserError, [T, string]>;
 type Parser<T> = (input: string) => ParserResult<T>;
 
 const lit = (match: string): Parser<string> => (input) => {
