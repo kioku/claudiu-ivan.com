@@ -1,4 +1,4 @@
-// search-engine.ts
+// search-dsl.ts
 
 // ======================
 // Core Types
@@ -6,7 +6,7 @@
 
 type IssueStatus = 'open' | 'closed';
 type IssueType = 'bug' | 'feature' | 'docs' | 'enhancement';
-type TimeFilter = 'hour' | 'day' | 'week' | 'month';
+type TimeRange = 'hour' | 'day' | 'week' | 'month';
 
 interface Issue {
   id: string;
@@ -28,14 +28,14 @@ type Either<L, R> = Left<L> | Right<R>;
 
 class Left<L> {
   constructor(readonly value: L) { }
-  isLeft(): this is Left<L> { return true }
-  isRight(): this is Right<never> { return false }
+  isLeft(): this is Left<L> { return true; }
+  isRight(): this is Right<never> { return false; }
 }
 
 class Right<R> {
   constructor(readonly value: R) { }
-  isLeft(): this is Left<never> { return false }
-  isRight(): this is Right<R> { return true }
+  isLeft(): this is Left<never> { return false; }
+  isRight(): this is Right<R> { return true; }
 }
 
 const success = <T>(value: T) => new Right(value);
@@ -46,7 +46,8 @@ const failure = <E>(error: E) => new Left(error);
 // ======================
 
 type ParserError = {
-  code: 'INVALID_TOKEN' | 'MISSING_VALUE' | 'TYPE_MISMATCH';
+  code: 'INVALID_TOKEN' | 'MISSING_VALUE' | 'INVALID_STATUS' | 'INVALID_TYPE' | 'INVALID_TIME_FILTER';
+  message: string;
   position: number;
   input: string;
 };
@@ -58,11 +59,11 @@ const lit = (match: string): Parser<string> => (input) => {
   if (input.startsWith(match)) {
     return success<[string, string]>([match, input.slice(match.length).trim()]);
   }
-
   return failure({
     code: 'INVALID_TOKEN',
+    message: `Expected "${match}"`,
     position: 0,
-    input: match
+    input,
   });
 };
 
@@ -73,17 +74,14 @@ const alt = <T>(...parsers: Parser<T>[]): Parser<T> => (input) => {
   }
   return failure({
     code: 'INVALID_TOKEN',
+    message: `No matching alternative`,
     position: 0,
-    input
+    input,
   });
 };
 
 const seq = <T extends unknown[]>(...parsers: { [K in keyof T]: Parser<T[K]> }): Parser<T> =>
   (input) => {
-    if (input === '') {
-      return success<[T, string]>([[] as unknown as T, '']);
-    }
-
     let remaining = input;
     const results: unknown[] = [];
 
@@ -95,8 +93,6 @@ const seq = <T extends unknown[]>(...parsers: { [K in keyof T]: Parser<T[K]> }):
       results.push(result.value[0]);
       remaining = result.value[1];
     }
-
-
     return success<[T, string]>([results as T, remaining]);
   };
 
@@ -105,60 +101,107 @@ const many = <T>(parser: Parser<T>): Parser<T[]> => (input: string) => {
   let remaining = input;
 
   while (true) {
-    const result = parser(remaining.trim());
+    const trimmedRemaining = remaining.trim();
+    const result = parser(trimmedRemaining);
     if (result.isLeft()) break;
 
     results.push(result.value[0]);
     remaining = result.value[1];
-    if (remaining === '') break;
   }
-
   return success<[T[], string]>([results, remaining]);
+};
+
+const map = <T, U>(parser: Parser<T>, fn: (value: T) => U): Parser<U> => (input) => {
+  const result = parser(input);
+  if (result.isRight()) {
+    const [value, remaining] = result.value;
+    return success<[U, string]>([fn(value), remaining]);
+  }
+  return result;
 };
 
 const word = (): Parser<string> => (input: string) => {
   const match = input.match(/^(\w+)/);
   return match
     ? success<[string, string]>([match[1], input.slice(match[1].length).trim()])
-    : failure({ code: 'INVALID_TOKEN', position: 0, input });
+    : failure({ code: 'INVALID_TOKEN', message: 'Expected a word', position: 0, input });
+};
+
+// ======================
+// AST Node Types
+// ======================
+
+type FilterNodeType = 'status' | 'author' | 'label' | 'type' | 'updated' | 'and' | 'or';
+
+type LeafFilterNode = {
+  readonly type: FilterNodeType;
+  readonly value: string;
 }
+
+type FilterNode = LeafFilterNode | {
+  type: 'and' | 'or';
+  value: FilterNode[];
+};
 
 // ======================
 // Filter Parsers
 // ======================
 
-const statusParser = seq(
-  lit('is:'),
-  alt(lit('open'), lit('closed'))
+const statusParser = map(
+  seq(lit('is:'), alt(lit('open'), lit('closed'))),
+  ([_, status]) => ({ type: 'status', value: status } as const)
 );
 
-const authorParser = seq(
-  lit('author:'),
-  word()
+const authorParser = map(
+  seq(lit('author:'), word()),
+  ([_, author]) => ({ type: 'author', value: author } as const)
 );
 
-const labelParser = seq(
-  lit('label:'),
-  word()
+const labelParser = map(
+  seq(lit('label:'), word()),
+  ([_, label]) => ({ type: 'label', value: label } as const)
 );
 
-const typeParser = seq(
-  lit('type:'),
-  alt(lit('bug'), lit('feature'), lit('docs'), lit('enhancement'))
+const typeParser = map(
+  seq(lit('type:'), alt(lit('bug'), lit('feature'), lit('docs'), lit('enhancement'))),
+  ([_, type]) => ({ type: 'type', value: type } as const)
 );
 
-const timeFilterParser = seq(
-  lit('updated:'),
-  alt(lit('hour'), lit('day'), lit('week'), lit('month'))
+const timeFilterParser = map(
+  seq(lit('updated:'), alt(lit('hour'), lit('day'), lit('week'), lit('month'))),
+  ([_, timeFilter]) => ({ type: 'updated', value: timeFilter } as const)
 );
 
-const searchQueryParser = many(alt(
-  statusParser,
-  typeParser,
-  labelParser,
-  authorParser,
-  timeFilterParser
-));
+const orParser: Parser<FilterNode> = map(
+  seq(
+    lit('('),
+    many(
+      alt<LeafFilterNode>(
+        statusParser, authorParser, labelParser, typeParser, timeFilterParser
+      )
+    ),
+    lit(')')
+  ),
+  ([_, filters, __]) => {
+    if (filters.length === 1) {
+      return filters[0];
+    }
+    return { type: 'or', value: filters }
+  }
+)
+
+const searchQueryParser: Parser<FilterNode> = map(
+  many(alt(statusParser, authorParser, labelParser, typeParser, timeFilterParser, orParser)),
+  (filters) => {
+    if (filters.length === 0) {
+      return { type: 'and', value: [] }; // Default to matching everything
+    }
+    if (filters.length === 1) {
+      return filters[0]; // Single filter, no need for 'and'
+    }
+    return { type: 'and', value: filters }; // Combine multiple filters with 'and'
+  }
+);
 
 // ======================
 // Predicate System
@@ -166,26 +209,19 @@ const searchQueryParser = many(alt(
 
 type IssuePredicate = (issue: Issue) => boolean;
 
-const matchAny = (): IssuePredicate => (v) => true;
-const matchNone = (): IssuePredicate => (v) => false;
+const matchAny = () => (issue: Issue) => true;
+const matchNone = () => (issue: Issue) => false;
 
-const matchTime = (filter: TimeFilter): IssuePredicate =>
-  (issue) => {
-    const diff = Date.now() - issue.updatedAt;
-    switch (filter) {
-      case 'hour':
-        return diff <= 3600000;
-      case 'day':
-        return diff <= 86400000;
-      case 'week':
-        return diff <= 604800000;
-      case 'month':
-        return diff <= 2592000000;
-    }
-  };
-
-const matchStatus = (status: IssueStatus): IssuePredicate =>
-  (issue) => issue.status === status;
+const isValidIssueStatus = (value: string): value is IssueStatus => {
+  return ['open', 'closed'].includes(value);
+};
+const matchStatus = (status: string): IssuePredicate => {
+  if (isValidIssueStatus(status)) {
+    return (issue) => issue.status === status;
+  }
+  console.error(`Invalid status: ${status}`);
+  return matchNone();
+};
 
 const matchAuthor = (author: string): IssuePredicate =>
   (issue) => issue.author === author;
@@ -193,128 +229,82 @@ const matchAuthor = (author: string): IssuePredicate =>
 const matchLabel = (label: string): IssuePredicate =>
   (issue) => issue.labels.includes(label);
 
-const matchType = (type: IssueType): IssuePredicate =>
-  (issue) => issue.type === type;
+const isValidIssueType = (value: string): value is IssueType => {
+  return ['bug', 'feature', 'docs', 'enhancement'].includes(value);
+};
+const matchType = (type: string): IssuePredicate => {
+  if (isValidIssueType(type)) {
+    return (issue) => issue.type === type;
+  }
+  console.error(`Invalid type: ${type}`);
+  return matchNone();
+};
 
-const matchAssignee = (assignee: string): IssuePredicate =>
-  (issue) => issue.assignee === assignee;
+const isValidTimeFilter = (value: string): value is TimeRange => {
+  return ['hour', 'day', 'week', 'month'].includes(value);
+};
+const matchTime = (filter: string): IssuePredicate => {
+  if (!isValidTimeFilter(filter)) {
+    console.error(`Invalid time filter: ${filter}`);
+    return matchNone();
+  }
 
-const matchMilestone = (milestone: string): IssuePredicate =>
-  (issue) => issue.milestone === milestone;
+  return (issue) => {
+    const diff = Date.now() - issue.updatedAt;
+    switch (filter) {
+      case 'hour': return diff <= 3600000;
+      case 'day': return diff <= 86400000;
+      case 'week': return diff <= 604800000;
+      case 'month': return diff <= 2592000000;
+      default: return false;
+    }
+  }
+};
+
+const createPredicate = (node: FilterNode): IssuePredicate => {
+  switch (node.type) {
+    case 'status':
+      return isValidIssueStatus(node.value) ? matchStatus(node.value) : matchNone();
+    case 'author':
+      return matchAuthor(node.value!);
+    case 'label':
+      return matchLabel(node.value!);
+    case 'type':
+      return isValidIssueType(node.value) ? matchType(node.value) : matchNone();
+    case 'updated':
+      return isValidTimeFilter(node.value) ? matchTime(node.value) : matchNone();
+    case 'and':
+      return and(...(node.value as FilterNode[]).map(createPredicate));
+    case 'or':
+      return or(...(node.value as FilterNode[]).map(createPredicate));
+  }
+};
 
 const and = (...preds: IssuePredicate[]): IssuePredicate =>
-  (doc) => preds.every(p => p(doc));
+  (issue) => preds.every(p => p(issue));
 
 const or = (...preds: IssuePredicate[]): IssuePredicate =>
-  (doc) => preds.some(p => p(doc));
-
-// @todo how to handle or()
-// Create complex query
-//const queryPredicate = and(
-//  matchText('urgent'),
-//  or(
-//    matchType('document'),
-//    matchPriority('high')
-//  )
-//);
-
-const searchQueryMapFn = ([key, value]: [string, string]): IssuePredicate => {
-  switch (key) {
-    case 'is:':
-      return matchStatus(value as IssueStatus);
-    case 'author:':
-      return matchAuthor(value);
-    case 'label:':
-      return matchLabel(value);
-    case 'type:':
-      return matchType(value as IssueType);
-    case 'assignee:':
-      return matchAssignee(value);
-    case 'milestone:':
-      return matchMilestone(value);
-    default:
-      return matchAny();
-  }
-};
-
-const createSearchPredicate = (result: ParserResult<Array<[string, string]>>): IssuePredicate =>
-  result.isRight() ? and(...result.value[0].map(searchQueryMapFn)) : and(matchNone());
-
-
-
-// ======================
-// Indexing System
-// ======================
-
-
-interface SearchIndex {
-  status: Map<IssueStatus, Set<string>>;
-  authors: Map<string, Set<string>>;
-  labels: Map<string, Set<string>>;
-  types: Map<IssueType, Set<string>>;
-  assignees: Map<string, Set<string>>;
-  milestones: Map<string, Set<string>>;
-}
-
-const buildIndex = (issues: Issue[]): SearchIndex => {
-  const index: SearchIndex = {
-    status: new Map(),
-    authors: new Map(),
-    labels: new Map(),
-    types: new Map(),
-    assignees: new Map(),
-    milestones: new Map()
-  };
-
-  for (const issue of issues) {
-    // Status Index
-    index.status.set(issue.status,
-      (index.status.get(issue.status) || new Set()).add(issue.id));
-
-    // Author Index
-    index.authors.set(issue.author,
-      (index.authors.get(issue.author) || new Set()).add(issue.id));
-
-    // Labels Index
-    issue.labels.forEach(label => {
-      index.labels.set(label,
-        (index.labels.get(label) || new Set()).add(issue.id));
-    });
-
-    // Type Index
-    index.types.set(issue.type,
-      (index.types.get(issue.type) || new Set()).add(issue.id));
-
-    // Assignee Index
-    if (issue.assignee) {
-      index.assignees.set(issue.assignee,
-        (index.assignees.get(issue.assignee) || new Set()).add(issue.id));
-    }
-
-    // Milestone Index
-    if (issue.milestone) {
-      index.milestones.set(issue.milestone,
-        (index.milestones.get(issue.milestone) || new Set()).add(issue.id));
-    }
-  }
-
-  return index;
-};
+  (issue) => preds.some(p => p(issue));
 
 // ======================
 // Query Execution
 // ======================
 
-const executeQuery = (
-  index: SearchIndex,
-  predicate: IssuePredicate,
-  issues: Issue[]
-): Issue[] => {
+const executeQuery = (query: string, issues: Issue[]): Issue[] => {
+  const parsedQuery = searchQueryParser(query);
+
+  if (parsedQuery.isLeft()) {
+    console.error(`Parse Error: ${parsedQuery.value.message}`);
+    return []; // Return empty array on parse failure
+  }
+
+  const ast = parsedQuery.value[0];
+  const predicate = createPredicate(ast);
   return issues.filter(predicate);
 };
 
 // ======================
-// Demo Usage
+// Test Data
 // ======================
 
 function generateTestIssues(count: number): Issue[] {
@@ -343,23 +333,39 @@ function generateTestIssues(count: number): Issue[] {
   }));
 }
 
-const issues = generateTestIssues(100_000);
-const searchIndex = buildIndex([]);
+// ======================
+// Basic Unit Tests (using a simple assertion library)
+// ======================
+const assert = {
+  deepEqual: (actual: any, expected: any, message: string) => {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      console.error(`Assertion failed: ${message}\nActual: ${JSON.stringify(actual)}\nExpected: ${JSON.stringify(expected)}`);
+    } else {
+      console.log(`Assertion passed: ${message}`);
+    }
+  },
+};
 
-// Example usage:
-//const input = 'is:open label:bug';
-//const parsedSearchQuery = searchQueryParser(input);
-//const query = createSearchPredicate(parsedSearchQuery);
-//console.log(parsedSearchQuery);
+//Test cases
+const testIssues: Issue[] = [
+  { id: '1', title: 'Bug in module A', status: 'open', author: 'alice', labels: ['bug'], type: 'bug', updatedAt: Date.now() - 3600000, milestone: null, assignee: null },
+  { id: '2', title: 'Feature request', status: 'closed', author: 'bob', labels: ['enhancement'], type: 'feature', updatedAt: Date.now() - 86400000, milestone: null, assignee: null },
+];
 
-// Execute query
-//const results = executeQuery(searchIndex, createSearchPredicate(parsedSearchQuery), issues);
-//console.log('query ->', input)
-//console.log('search result count ->', results.length);
-//console.log(issues.slice(3));
-//console.log('Search Results:', results);
-//
+// Test parsing and predicate creation
+assert.deepEqual(searchQueryParser('is:open').value[0], { type: 'status', value: 'open' }, 'statusParser test');
+assert.deepEqual(createPredicate(searchQueryParser('is:open').value[0])(testIssues[0]), true, 'createPredicate status test');
+assert.deepEqual(executeQuery('is:open', testIssues), [testIssues[0]], 'executeQuery test');
+assert.deepEqual(executeQuery('is:open label:bug', testIssues), [testIssues[0]], 'executeQuery combined test');
+assert.deepEqual(executeQuery('is:closed author:bob', testIssues), [testIssues[1]], 'executeQuery combined test 2');
+assert.deepEqual(executeQuery('is:open author:bob', testIssues), [], 'executeQuery combined test 3');
+assert.deepEqual(executeQuery('is:open label:bug author:alice updated:day', testIssues), [testIssues[0]], 'executeQuery combined test 4');
+assert.deepEqual(executeQuery('(is:open author:bob)', testIssues), testIssues, 'executeQuery OR test');
+assert.deepEqual(executeQuery('(is:open author:bob) updated:week', testIssues), testIssues, 'executeQuery OR test 2');
 
+// ======================
+// Benchmarking
+// ======================
 function showSearchStats(
   query: string,
   issues: Issue[],
@@ -371,19 +377,19 @@ function showSearchStats(
 
   console.log(`Search Results for: "${query}"`);
   console.log('----------------------------------------');
-  console.log(`Total issues: ${issues.length}`);
+  //console.log(`Total issues: ${issues.length}`);
   console.log(`Matching issues: ${results.length}`);
   console.log(`Search time: ${duration.toFixed(2)}ms`);
   console.log('');
-  console.log('Sample matches:');
-  results.slice(0, 3).forEach(issue => {
-    console.log(`#${issue.id}: ${issue.title}`);
-    console.log(`  Status: ${issue.status}`);
-    console.log(`  Author: ${issue.author}`);
-    console.log(`  Labels: ${issue.labels.join(', ')}`);
-    console.log(`  Type: ${issue.type}`);
-    console.log('');
-  });
+  //console.log('Sample matches:');
+  //results.slice(0, 3).forEach(issue => {
+  //  console.log(`#${issue.id}: ${issue.title}`);
+  //  console.log(`  Status: ${issue.status}`);
+  //  console.log(`  Author: ${issue.author}`);
+  //  console.log(`  Labels: ${issue.labels.join(', ')}`);
+  //  console.log(`  Type: ${issue.type}`);
+  //  console.log('');
+  //});
 }
 
 // Example usage:
@@ -392,51 +398,19 @@ const testQueries = [
   'is:closed',
   'is:open label:bug',
   'author:alice type:feature',
-  'is:closed milestone:v1.0 assignee:bob',
   'label:documentation type:docs',
-  'is:open author:charlie label:enhancement'
+  'is:open (author:charlie author:alice) label:enhancement'
 ];
 
-//const issues = generateTestIssues(1000);
-//const index = buildIndex(issues);
+const issues = generateTestIssues(1_000_000);
 
 testQueries.forEach(query => {
   const startTime = performance.now();
   const results = executeQuery(
-    searchIndex,
-    createSearchPredicate(searchQueryParser(query)),
+    query,
     issues
   );
   showSearchStats(query, issues, results, startTime);
 });
 
-//Improvements:
-//1. Error Handling:
-//- The parser error handling is basic - errors only contain position and code but no meaningful error messages
-//- Failed parses silently return `matchNone()` instead of explaining why the search failed
-//- No validation of input values against allowed enums
-//
-//2. Performance Issues:
-//- `executeQuery` does a full scan of documents without utilizing the index structure
-//- The text search index is naive - no stemming, tokenization, or proper word boundary handling
-//- Large result sets are not paginated
-//- No caching mechanism for frequent queries
-//
-//3. Type Safety:
-//- Unsafe type assertions in `mapFn` (using `as` for DocumentTypeLocal, PriorityLevel etc)
-//- Parser results could be more strongly typed
-//- No runtime validation of enum values
-//
-//4. Architecture:
-//- Search index implementation is incomplete - text index exists but isn't used
-//- No support for compound queries (AND/OR combinations) in the query language
-//- No support for ranges in date filters (only predefined time windows)
-//- Missing features like sorting, field selection, fuzzy matching
-//
-//The most critical improvements would be:
-//1. Properly utilize the index structure in `executeQuery`
-//2. Add proper error handling and validation
-//3. Implement pagination
-//4. Add compound query support
-//
 
