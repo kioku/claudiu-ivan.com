@@ -116,7 +116,7 @@ const many = <T>(parser: Parser<T>): Parser<T[]> => (input: string) => {
   return success<[T[], string]>([results, remaining]);
 };
 
-const label = (): Parser<string> => (input: string) => {
+const word = (): Parser<string> => (input: string) => {
   const match = input.match(/^(\w+)/);
   return match
     ? success<[string, string]>([match[1], input.slice(match[1].length).trim()])
@@ -134,12 +134,12 @@ const statusParser = seq(
 
 const authorParser = seq(
   lit('author:'),
-  label()
+  word()
 );
 
 const labelParser = seq(
   lit('label:'),
-  label()
+  word()
 );
 
 const typeParser = seq(
