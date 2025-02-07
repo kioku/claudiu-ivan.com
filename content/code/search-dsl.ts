@@ -27,13 +27,15 @@ interface Issue {
 type Either<L, R> = Left<L> | Right<R>;
 
 class Left<L> {
-  constructor(readonly value: L) { }
+  value: L;
+  constructor(value: L) { this.value = value; }
   isLeft(): this is Left<L> { return true; }
   isRight(): this is Right<never> { return false; }
 }
 
 class Right<R> {
-  constructor(readonly value: R) { }
+  value: R;
+  constructor(value: R) { this.value = value; }
   isLeft(): this is Left<never> { return false; }
   isRight(): this is Right<R> { return true; }
 }
