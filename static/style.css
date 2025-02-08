@@ -9,6 +9,7 @@
   ::backdrop {
     --text: #3a3a3a;
     --text-deep: #1a1a1a;
+    --code: #5c9745;
   }
 }
 
@@ -18,6 +19,7 @@
   ::backdrop {
     --accent: #ababab;
     --text-deep: #bbb;
+    --code: #8fc07c;
   }
 }
 
