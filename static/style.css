@@ -119,3 +119,8 @@ pre table {
   width: 100%;
   border-collapse: collapse;
 }
+
+body>footer {
+  border: 0;
+  margin-top: 0;
+}
