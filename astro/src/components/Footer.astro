@@ -1,0 +1,23 @@
+---
+import Container from "@components/Container.astro";
+import { SITE } from "@consts";
+//import BackToTop from "@components/BackToTop.astro";
+
+const year = new Date().getFullYear();
+const copyrightLabel = [year, SITE.NAME].join(" | ");
+---
+
+<footer>
+  <Container>
+    <div class="relative">
+      <!--<div class="absolute right-0 -top-20">-->
+      <!--  <BackToTop />-->
+      <!--</div>-->
+    </div>
+    <div class="flex justify-center items-center">
+      <div>
+        &copy; {copyrightLabel}
+      </div>
+    </div>
+  </Container>
+</footer>

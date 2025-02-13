@@ -1,0 +1,38 @@
+---
+import { getCollection } from "astro:content";
+import PageLayout from "@layouts/PageLayout.astro";
+import Container from "@components/Container.astro";
+import CollectionListItem from "@components/CollectionListItem.astro";
+import { BLOG } from "@consts";
+
+const data = (await getCollection("writing"))
+  .filter(post => !post.data.draft)
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+---
+
+<PageLayout title={BLOG.TITLE} description={BLOG.DESCRIPTION}>
+  <Container>
+    <div class="space-y-10">
+      <div class="font-semibold text-black dark:text-white">
+        Writing
+      </div>
+      <div class="space-y-4">
+        <section class="space-y-4">
+          <div class="font-semibold text-black dark:text-white">
+          </div>
+          <div>
+            <ul class="flex flex-col gap-4 text-stone-900 hover:text-stone-400 dark:text-stone-100 dark:hover:text-stone-500">
+              {
+                data.map((post) => (
+                  <li>
+                    <CollectionListItem entry={post} />
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+  </Container>
+</PageLayout>

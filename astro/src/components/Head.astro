@@ -1,0 +1,109 @@
+---
+import "../styles/global.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-600.css";
+import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2";
+import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2";
+import { ViewTransitions } from "astro:transitions";
+
+interface Props {
+  title: string;
+  description: string;
+  image?: string;
+}
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+const { title, description, image = "/apple-touch-icon.png" } = Astro.props;
+---
+
+<!-- Global Metadata -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png'" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png'" />
+<meta name="generator" content={Astro.generator} />
+
+<!-- Font preloads -->
+<link rel="preload" href={inter400} as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href={inter600} as="font" type="font/woff2" crossorigin/>
+
+<!-- Canonical URL -->
+<link rel="canonical" href={canonicalURL} />
+
+<!-- Primary Meta Tags -->
+<title>{title}</title>
+<meta name="title" content={title} />
+<meta name="description" content={description} />
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={Astro.url} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={new URL(image, Astro.url)} />
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:url" content={Astro.url} />
+<meta property="twitter:title" content={title} />
+<meta property="twitter:description" content={description} />
+<meta property="twitter:image" content={new URL(image, Astro.url)} />
+
+<ViewTransitions  />
+
+<script>
+  import type { TransitionBeforeSwapEvent } from "astro:transitions/client";
+  document.addEventListener("astro:before-swap", (e) =>
+    [
+      ...(e as TransitionBeforeSwapEvent).newDocument.head.querySelectorAll(
+        "link[as=\"font\"]"
+      ),
+    ].forEach((link) => link.remove())
+  );
+</script>
+
+<script is:inline>
+  function init() {
+    toggleTheme();
+
+    const backToTop = document.getElementById("back-to-top");
+    backToTop?.addEventListener("click", (event) => scrollToTop(event));
+
+    const backToPrev = document.getElementById("back-to-prev");
+    backToPrev?.addEventListener("click", () => window.history.back());
+  }
+
+function toggleTheme(themeStyle = "dark") {
+    const css = document.createElement("style");
+
+    css.appendChild(
+      document.createTextNode(
+        `* {
+             -webkit-transition: none !important;
+             -moz-transition: none !important;
+             -o-transition: none !important;
+             -ms-transition: none !important;
+             transition: none !important;
+          }
+        `,
+      )
+    );
+
+    document.head.appendChild(css);
+
+    if (themeStyle === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
+    window.getComputedStyle(css).opacity;
+    document.head.removeChild(css);
+  }
+
+
+  document.addEventListener("DOMContentLoaded", () => init());
+  document.addEventListener("astro:after-swap", () => init());
+</script>
