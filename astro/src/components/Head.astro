@@ -14,15 +14,34 @@ interface Props {
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
+const favicon16 = new URL("favicon-16x16.png", Astro.url.origin);
+const favicon32 = new URL("favicon-32x32.png", Astro.url.origin);
+const apple = new URL("apple-touch-icon.png", Astro.url.origin);
+const ogImage = new URL("og.png", Astro.url.origin);
+const twitterImage = new URL("twitter.png", Astro.url.origin);
+
+const config = {
+  author: "Claudiu Ivan",
+  verification: {
+    google: "XHtlMzh4rtF0BX73TQZtxFUtaDw3fBcDFNy7sJixems",
+    bing: "B08B038A701BDB776D8BCC3BC84D5BD3",
+  },
+};
+
 const { title, description, image = "/apple-touch-icon.png" } = Astro.props;
 ---
 
 <!-- Global Metadata -->
 <meta charset="utf-8" />
+<meta name="revisit-after" content="7 days" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png'" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png'" />
+<meta name="author" content={config.author} />
+<meta name="google-site-verification" content={config.verification.google} />
+<meta name="msvalidate.01" content={config.verification.bing} />
+
+<link rel="icon" type="image/png" sizes="16x16" href={favicon16} />
+<link rel="icon" type="image/png" sizes="32x32" href={favicon32} />
+<link rel="apple-touch-icon" sizes="180x180" href={apple} />
 <meta name="generator" content={Astro.generator} />
 
 <!-- Font preloads -->
@@ -42,14 +61,14 @@ const { title, description, image = "/apple-touch-icon.png" } = Astro.props;
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
-<meta property="og:image" content={new URL(image, Astro.url)} />
+<meta property="og:image" content={ogImage} />
 
 <!-- Twitter -->
 <meta property="twitter:card" content="summary_large_image" />
 <meta property="twitter:url" content={Astro.url} />
 <meta property="twitter:title" content={title} />
 <meta property="twitter:description" content={description} />
-<meta property="twitter:image" content={new URL(image, Astro.url)} />
+<meta property="twitter:image" content={twitterImage} />
 
 <ViewTransitions  />
 
@@ -107,3 +126,9 @@ function toggleTheme(themeStyle = "dark") {
   document.addEventListener("DOMContentLoaded", () => init());
   document.addEventListener("astro:after-swap", () => init());
 </script>
+
+<script
+  data-goatcounter="https://kioku.goatcounter.com/count"
+  defer
+  src="//gc.zgo.at/count.js"
+></script>
