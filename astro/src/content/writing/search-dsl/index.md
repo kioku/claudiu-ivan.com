@@ -1,13 +1,13 @@
 ---
 title: "A Principled Approach to Querying Data"
-description: "Here is a sample of some basic Markdown syntax that can be used when writing Markdown content in Astro."
+description: "A principled approach to building a search DSL in TypeScript. Explore parser combinators, abstract syntax trees, and type-driven development."
 date: "Feb 06 2025"
 draft: false
 ---
 
-The rise of local-first web applications demands a rethinking of traditional client-server architectures. Users expect near-native responsiveness, even when offline. This necessitates efficient, client-side data processing, including search. The techniques presented in this article, while demonstrated in a generic context, are equally applicable to both local-first and server-side systems. We'll explore a type-driven approach, leveraging a Domain-Specific Language (DSL), to create a powerful and maintainable search system.
+The rise of local-first web applications demands a rethinking of traditional client-server architectures. Users expect near-native responsiveness, even when offline. This necessitates efficient, client-side data processing, including search. The techniques presented in this article, while discussed in a local-first context, are equally applicable to server-side systems.  We'll explore a type-driven approach, leveraging a Domain-Specific Language (DSL), to create a powerful and maintainable search system.
 
-The complete code for this article is available as a [GitHub Gist](https://gist.github.com/kioku/3350e4c4f1aac5d3f5f53e68923cb35a). It requires no external dependencies and can be run directly with Bun, Deno, or Node.js using the `--experimental-strip-types` flag.
+The complete, dependency-free code for this article is available as a [GitHub Gist](https://gist.github.com/kioku/3350e4c4f1aac5d3f5f53e68923cb35a).
 
 ## Domain-Specific Languages (DSLs)
 
@@ -79,7 +79,7 @@ Throughout the program, we'll use `Either` to propagate results. If a parsing st
 
 ## Parsing with precision
 
-To process queries, we employ [parser combinators](https://en.wikipedia.org/wiki/Parser_combinator). They are a powerful technique from functional programming, often used in compiler design, for building parsers in a modular, composable, and declarative way.
+To process queries, we employ parser combinators. They are a powerful technique from functional programming, often used in compiler design, for building parsers in a modular, composable, and declarative way.
 
 In essence, a parser combinator is a higher-order function: it takes one or more parsers as input and returns a _new_ parser. Each parser attempts to match a portion of the input string. If successful, it returns a `Right` containing the parsed value and the remaining input string. If it fails, it returns a `Left` with an error.
 
@@ -128,7 +128,7 @@ const many = <T>(parser: Parser<T>): Parser<T[]> => (input: string) => { ... };
 const map = <T, U>(parser: Parser<T>, fn: (value: T) => U): Parser<U> => (input) => { ... };
 ```
 
-We start with simple parsers (like `lit` and `word`) and combine them using combinators like `seq`, `alt`, and `many` to build increasingly complex parsers. The `map` combinator is crucial for transforming the raw parsed strings into a more structured representation – our Abstract Syntax Tree. This recursive nature of building complex structures from simpler ones is a hallmark of functional programming.
+We start with simple parsers (like `lit` and `word`) and combine them using combinators like `seq`, `alt`, and `many` to build increasingly complex parsers. The `map` combinator is important for transforming the raw parsed strings into a more structured representation – our Abstract Syntax Tree. This recursive nature of building complex structures from simpler ones is a hallmark of functional programming.
 
 Composition is amazing. It's remarkable what unexpected elegance emerges from combining simple elements. In this simplicity lies the beauty of parser combinators.
 
@@ -308,17 +308,19 @@ These optimizations can provide a path forward for scaling the system to handle 
 
 ## Conclusion
 
-This article has demonstrated a type-driven, functional approach to building a search DSL. We have leveraged TypeScript, functional parser combinators, and an AST to create a system that is not only functional but also clear, robust, and maintainable.
+This article has detailed a principled approach to querying data: a comprehensive system built on type safety, functional programming, and a clear separation of concerns. We've leveraged TypeScript, parser combinators, and an AST to create a search DSL that is not only functional but also robust, maintainable, and extensible.
 
 It's worth mentioning that the `Either` type is an example of a _monad_ – a fundamental concept in functional programming. Monads provide a way to structure computations that involve sequencing operations and handling potential failures or side effects. While a deep dive into monad theory is beyond the scope of this article, recognizing this connection can open doors to a deeper understanding of functional programming principles, and maybe even lessen the barries of entry.
 
-The techniques presented here provide a solid foundation for building sophisticated search capabilities in a variety of applications, from local-first web apps to server-side systems. By embracing these principles, developers can create search experiences that are both powerful and user-friendly.
+The techniques presented here provide a strong foundation for building advanced search capabilities, applicable to both local-first web applications and large-scale server-side systems. By adopting the principles outlined in this approach, developers can design search experiences that are both powerful and user-friendly.
 
 ## References and Further Reading
 
+- [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom 
 - [Functional Parsing](https://www.cs.nott.ac.uk/~pszgmh/pearl.pdf) by Graham Hutton and Erik Meijer
 - [Parsec: Direct Style Monadic Parser Combinators For The Real World](https://www.microsoft.com/en-us/research/publication/parsec-direct-style-monadic-parser-combinators-for-the-real-world/) by Daan Leijen and Erik Meijer
 - [Monads for Functional Programming](https://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf) by Philip Wadler
 - [Learn You a Haskell for Great Good!](http://learnyouahaskell.com/a-fistful-of-monads) (Chapter on Monads)
 - [Domain-Specific Languages](https://martinfowler.com/books/dsl.html) by Martin Fowler
+- [Professor Frisby's Mostly Adequate Guide to Functional Programming](https://mostly-adequate.gitbook.io/mostly-adequate-guide/)
 - [Local-first software: You own your data, in spite of the cloud](https://www.inkandswitch.com/local-first/) by Martin Kleppmann et al.
