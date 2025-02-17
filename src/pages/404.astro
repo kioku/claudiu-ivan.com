@@ -1,0 +1,29 @@
+---
+import Link from "@components/Link.astro";
+import PageLayout from "@layouts/PageLayout.astro";
+---
+
+<PageLayout title="404 - Page Not Found" showHeader={false} showFooter={false}>
+  <div class="center">
+    <h1 class="font-bold text-4xl mb-4"><span class="statusCode">404: </span> <span class="statusMessage">Not found</span></h1>
+    <Link href="/">Go back to the homepage</Link>
+  </div>
+</PageLayout>
+
+<style>
+  :root {
+    --accent-light: #E0CCFA;
+  }
+
+  .center {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+  }
+
+  .statusCode {
+    color: var(--accent-light);
+  }
+</style>

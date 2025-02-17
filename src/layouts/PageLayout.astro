@@ -9,7 +9,7 @@ type Props = {
   description: string;
 };
 
-const { title, description } = Astro.props;
+const { title, description, showHeader = true, showFooter = true } = Astro.props;
 ---
 
 <!doctype html>
@@ -18,10 +18,10 @@ const { title, description } = Astro.props;
     <Head title={`${title} | ${SITE.NAME}`} description={description} />
   </head>
   <body>
-    <Header />
+    {showHeader && <Header />}
     <main>
       <slot />
     </main>
-    <Footer />
+    {showFooter && <Footer />}
   </body>
 </html>

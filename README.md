@@ -2,7 +2,7 @@
 
 This is the source code for my [personal website](https://claudiu-ivan.com).
 
-It's build on top of Astro, Tailwind and Typescript, using [Astro Nano](https://github.com/markhorn-dev/astro-nano/tree/main) as a starting point.
+It's built on top of Astro, Tailwind and Typescript, using [Astro Nano](https://github.com/markhorn-dev/astro-nano/tree/main) as a starting point.
 
 ## Commands
 
