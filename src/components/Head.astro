@@ -9,7 +9,6 @@ import { ViewTransitions } from "astro:transitions";
 interface Props {
   title: string;
   description: string;
-  image?: string;
 }
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -28,7 +27,7 @@ const config = {
   },
 };
 
-const { title, description, image = "/apple-touch-icon.png" } = Astro.props;
+const { title, description } = Astro.props;
 ---
 
 <!-- Global Metadata -->
@@ -94,7 +93,15 @@ const { title, description, image = "/apple-touch-icon.png" } = Astro.props;
     backToPrev?.addEventListener("click", () => window.history.back());
   }
 
-function toggleTheme(themeStyle = "dark") {
+  function scrollToTop(event) {
+    event.preventDefault();
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  }
+
+  function toggleTheme(themeStyle = "dark") {
     const css = document.createElement("style");
 
     css.appendChild(
@@ -131,4 +138,5 @@ function toggleTheme(themeStyle = "dark") {
   data-goatcounter="https://kioku.goatcounter.com/count"
   defer
   src="//gc.zgo.at/count.js"
+  is:inline
 ></script>

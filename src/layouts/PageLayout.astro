@@ -6,10 +6,12 @@ import { SITE } from "@consts";
 
 type Props = {
   title: string;
-  description: string;
+  description?: string;
+  showHeader?: boolean;
+  showFooter?: boolean;
 };
 
-const { title, description, showHeader = true, showFooter = true } = Astro.props;
+const { title, description= "", showHeader = true, showFooter = true } = Astro.props;
 ---
 
 <!doctype html>
