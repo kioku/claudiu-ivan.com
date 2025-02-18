@@ -1,6 +1,6 @@
 ---
 title: "A Principled Approach to Querying Data"
-description: "A principled approach to building a search DSL in TypeScript. We explore a type-driven approach, leveraging a Domain-Specific Language (DSL), to create a powerful and maintainable search system."
+description: "This article explores a type-driven approach, leveraging a Domain-Specific Language (DSL), to create a powerful and maintainable search system."
 date: "Feb 06 2025"
 draft: false
 ---
