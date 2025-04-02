@@ -5,6 +5,7 @@ import "@fontsource/inter/latin-600.css";
 import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2";
 import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2";
 import { ViewTransitions } from "astro:transitions";
+import Posthog from "./Posthog.astro";
 
 interface Props {
   title: string;
@@ -136,9 +137,4 @@ const { title, description } = Astro.props;
   document.addEventListener("astro:after-swap", () => init());
 </script>
 
-<script
-  data-goatcounter="https://kioku.goatcounter.com/count"
-  defer
-  src="//gc.zgo.at/count.js"
-  is:inline
-></script>
+<Posthog />
