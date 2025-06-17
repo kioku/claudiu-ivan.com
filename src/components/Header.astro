@@ -13,7 +13,7 @@ const { articleTitle } = Astro.props;
   <Container>
     <div class="flex flex-wrap gap-y-2 justify-between items-center">
       {articleTitle && (
-        <div id="article-title" class="text-sm font-medium text-black dark:text-white opacity-0 transition-opacity duration-300">
+        <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300" style="opacity: 0;">
           {articleTitle}
         </div>
       )}
@@ -29,23 +29,21 @@ const { articleTitle } = Astro.props;
 {articleTitle && (
   <script>
     function handleScroll() {
-      const articleTitle = document.getElementById('article-title');
+      const articleTitle = document.getElementById("article-title");
       if (articleTitle) {
         if (window.scrollY > 200) {
-          articleTitle.classList.add('opacity-100');
-          articleTitle.classList.remove('opacity-0');
+          (articleTitle as HTMLElement).style.opacity = "1";
         } else {
-          articleTitle.classList.add('opacity-0');
-          articleTitle.classList.remove('opacity-100');
+          (articleTitle as HTMLElement).style.opacity = "0";
         }
       }
     }
 
-    window.addEventListener('scroll', handleScroll);
-    
+    window.addEventListener("scroll", handleScroll);
+
     // Cleanup on navigation
-    document.addEventListener('astro:before-preparation', () => {
-      window.removeEventListener('scroll', handleScroll);
+    document.addEventListener("astro:before-preparation", () => {
+      window.removeEventListener("scroll", handleScroll);
     });
   </script>
 )}
