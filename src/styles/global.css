@@ -54,6 +54,32 @@ article {
     @apply text-black dark:text-white;
     @apply decoration-black/25 dark:decoration-white/50;
   }
+
+  /* Responsive code block widths */
+  article pre {
+    @apply w-screen relative;
+    @apply -ml-4 px-4; /* Full width on mobile with padding */
+    @apply md:-ml-8 md:px-8; /* Wider on tablet */
+    @apply lg:-ml-16 lg:px-16; /* Even wider on desktop */
+    max-width: 100vw;
+    overflow-x: auto;
+  }
+
+  /* Desktop: Make code blocks wide enough for 160 columns */
+  @screen lg {
+    article pre {
+      @apply -ml-32 px-32;
+      width: calc(100vw - 2rem);
+      max-width: none;
+    }
+  }
+
+  /* Ensure code doesn't break layout */
+  article pre code {
+    @apply block whitespace-pre;
+    width: max-content;
+    min-width: 100%;
+  }
 }
 
 .animate {
