@@ -1,0 +1,71 @@
+---
+// This component will be used to enhance code blocks with copy functionality
+---
+
+<script>
+  function initCopyButtons() {
+    // Find all pre elements with code
+    const preElements = document.querySelectorAll('article pre');
+    
+    preElements.forEach((pre) => {
+      // Skip if already has copy button
+      if (pre.querySelector('.copy-button')) return;
+      
+      // Create copy button
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-button absolute top-2 right-2 p-2 text-sm bg-gray-800/50 hover:bg-gray-700/50 text-white rounded transition-colors duration-200 opacity-0 group-hover:opacity-100';
+      copyButton.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      `;
+      copyButton.title = 'Copy code';
+
+      // Add group class to pre for hover effect
+      pre.classList.add('group');
+      
+      // Position relatively
+      (pre as HTMLElement).style.position = 'relative';
+      
+      // Add copy functionality
+      copyButton.addEventListener('click', async () => {
+        const code = pre.querySelector('code');
+        if (code) {
+          try {
+            await navigator.clipboard.writeText(code.textContent || '');
+            
+            // Show feedback
+            copyButton.innerHTML = `
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"></path>
+              </svg>
+            `;
+            copyButton.title = 'Copied!';
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+              copyButton.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              `;
+              copyButton.title = 'Copy code';
+            }, 2000);
+          } catch (err) {
+            console.error('Failed to copy: ', err);
+          }
+        }
+      });
+
+      pre.appendChild(copyButton);
+    });
+  }
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', initCopyButtons);
+  
+  // Reinitialize on Astro navigation
+  document.addEventListener('astro:page-load', initCopyButtons);
+</script>

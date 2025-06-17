@@ -2,6 +2,7 @@
 import Head from "@components/Head.astro";
 import Header from "@components/Header.astro";
 import Footer from "@components/Footer.astro";
+import CodeBlock from "@components/CodeBlock.astro";
 import { SITE } from "@consts";
 
 type Props = {
@@ -25,5 +26,6 @@ const { title, description= "", showHeader = true, showFooter = true } = Astro.p
       <slot />
     </main>
     {showFooter && <Footer />}
+    <CodeBlock />
   </body>
 </html>
