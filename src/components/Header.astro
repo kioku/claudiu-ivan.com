@@ -1,12 +1,23 @@
 ---
 import Container from "@components/Container.astro";
 import Link from "@components/Link.astro";
+
+type Props = {
+  articleTitle?: string;
+};
+
+const { articleTitle } = Astro.props;
 ---
 
 <header>
   <Container>
-    <div class="flex flex-wrap gap-y-2 justify-end">
-      <nav class="flex gap-1">
+    <div class="flex flex-wrap gap-y-2 justify-between items-center">
+      {articleTitle && (
+        <div id="article-title" class="text-sm font-medium text-black dark:text-white opacity-0 transition-opacity duration-300">
+          {articleTitle}
+        </div>
+      )}
+      <nav class="flex gap-1 ml-auto">
         <Link href="/">Home</Link>
         <span>&nbsp;</span>
         <Link href="/writing">Writing</Link>
@@ -14,3 +25,27 @@ import Link from "@components/Link.astro";
     </div>
   </Container>
 </header>
+
+{articleTitle && (
+  <script>
+    function handleScroll() {
+      const articleTitle = document.getElementById('article-title');
+      if (articleTitle) {
+        if (window.scrollY > 200) {
+          articleTitle.classList.add('opacity-100');
+          articleTitle.classList.remove('opacity-0');
+        } else {
+          articleTitle.classList.add('opacity-0');
+          articleTitle.classList.remove('opacity-100');
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll);
+    
+    // Cleanup on navigation
+    document.addEventListener('astro:before-preparation', () => {
+      window.removeEventListener('scroll', handleScroll);
+    });
+  </script>
+)}
