@@ -29,7 +29,7 @@ const { articleTitle } = Astro.props;
 <script>
   function handleScroll() {
     const articleTitleDiv = document.getElementById("article-title");
-    if (articleTitleDiv!) {
+    if (articleTitleDiv) {
       if (window.scrollY > 200) {
         articleTitleDiv.style.opacity = "1";
       } else {
@@ -38,7 +38,7 @@ const { articleTitle } = Astro.props;
     }
   }
 
-  window.addEventListener("scroll", () => handleScroll());
+  window.addEventListener("scroll", handleScroll);
 
   // Cleanup on navigation
   document.addEventListener("astro:before-preparation", () => {
