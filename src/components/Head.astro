@@ -4,7 +4,6 @@ import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-600.css";
 import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2";
 import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2";
-import { ViewTransitions } from "astro:transitions";
 import Posthog from "./Posthog.astro";
 
 interface Props {
@@ -72,7 +71,8 @@ const { title, description } = Astro.props;
 <meta property="twitter:description" content={description} />
 <meta property="twitter:image" content={twitterImage} />
 
-<ViewTransitions  />
+<meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
 
 <script>
   import type { TransitionBeforeSwapEvent } from "astro:transitions/client";
