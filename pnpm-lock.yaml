@@ -56,6 +56,9 @@ importers:
       globals:
         specifier: ^16.3.0
         version: 16.3.0
+      katex:
+        specifier: ^0.16.22
+        version: 0.16.22
       playwright:
         specifier: ^1.53.0
         version: 1.54.1
