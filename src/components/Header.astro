@@ -13,7 +13,7 @@ const { articleTitle } = Astro.props;
   <Container>
     <div class={`flex flex-wrap gap-y-2 ${articleTitle ? "justify-between items-center" : "justify-end"}`}>
       {articleTitle && (
-        <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300" style="opacity: 0;">
+        <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300">
           {articleTitle}
         </div>
       )}
@@ -29,14 +29,18 @@ const { articleTitle } = Astro.props;
 <script>
   function handleScroll() {
     const articleTitleDiv = document.getElementById("article-title");
-    if (articleTitleDiv) {
-      if (window.scrollY > 200) {
-        articleTitleDiv.style.opacity = "1";
-      } else {
-        articleTitleDiv.style.opacity = "0";
-      }
+    if (!articleTitleDiv) {
+      return;
+    }
+
+    if (window.scrollY > 200) {
+      articleTitleDiv.style.opacity = "1";
+    } else {
+      articleTitleDiv.style.opacity = "0";
     }
   }
+
+  handleScroll();
 
   window.addEventListener("scroll", handleScroll);
 
