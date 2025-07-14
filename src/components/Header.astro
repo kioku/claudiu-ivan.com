@@ -11,13 +11,13 @@ const { articleTitle } = Astro.props;
 
 <header>
   <Container>
-    <div class="flex flex-wrap gap-y-2 justify-between items-center">
+    <div class={`flex flex-wrap gap-y-2 ${articleTitle ? "justify-between items-center" : "justify-end"}`}>
       {articleTitle && (
         <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300" style="opacity: 0;">
           {articleTitle}
         </div>
       )}
-      <nav class="flex gap-1 ml-auto">
+      <nav class="flex gap-1">
         <Link href="/">Home</Link>
         <span>&nbsp;</span>
         <Link href="/writing">Writing</Link>
@@ -26,24 +26,22 @@ const { articleTitle } = Astro.props;
   </Container>
 </header>
 
-{articleTitle && (
-  <script>
-    function handleScroll() {
-      const articleTitle = document.getElementById("article-title");
-      if (articleTitle) {
-        if (window.scrollY > 200) {
-          (articleTitle as HTMLElement).style.opacity = "1";
-        } else {
-          (articleTitle as HTMLElement).style.opacity = "0";
-        }
+<script>
+  function handleScroll() {
+    const articleTitleDiv = document.getElementById("article-title");
+    if (articleTitleDiv!) {
+      if (window.scrollY > 200) {
+        articleTitleDiv.style.opacity = "1";
+      } else {
+        articleTitleDiv.style.opacity = "0";
       }
     }
+  }
 
-    window.addEventListener("scroll", handleScroll);
+  window.addEventListener("scroll", () => handleScroll());
 
-    // Cleanup on navigation
-    document.addEventListener("astro:before-preparation", () => {
-      window.removeEventListener("scroll", handleScroll);
-    });
-  </script>
-)}
+  // Cleanup on navigation
+  document.addEventListener("astro:before-preparation", () => {
+    window.removeEventListener("scroll", handleScroll);
+  });
+</script>
