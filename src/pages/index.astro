@@ -18,24 +18,23 @@ const writing = (await getCollection("writing"))
     <div class="space-y-16">
       <section>
         <article class="space-y-6">
-          <div class="space-y-2">
-            <h1 class="text-3xl font-bold text-black dark:text-white">
-              {SITE.NAME}
-            </h1>
-            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-              Principal Architect: High-Performance Financial Platforms
-            </h3>
-          </div>
-          <p class="text-lg leading-relaxed">
-            I architect and build the complex, data-intensive systems that power FinTech and InsurTech. My practice is built on a decade of experience translating extreme business requirements into resilient, scalable, and provably correct software.
-          </p>
-          <hr class="border-gray-300 dark:border-gray-600" />
-          <div class="flex flex-wrap gap-x-4 gap-y-2 text-base">
-            <Link href="/writing" aria-label="writing">Read my thinking</Link>
-            <span class="text-gray-400">⋅</span>
-            <Link href="https://github.com/kioku" aria-label="github" external>See my work on GitHub</Link>
-            <span class="text-gray-400">⋅</span>
-            <Link href="mailto:claudiu.ivan@me.com" aria-label="email">Contact me</Link>
+          <div class="flex flex-col md:flex-row md:items-start md:gap-8">
+            <div class="order-2 md:order-1 flex-shrink-0">
+              <Monogram size="large" class="mx-auto md:mx-0" />
+            </div>
+            <div class="order-1 md:order-2 space-y-4">
+              <div class="space-y-2">
+                <h1 class="text-3xl font-bold text-black dark:text-white">
+                  {SITE.NAME}
+                </h1>
+                <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                  Principal Architect: High-Performance Financial Platforms
+                </h2>
+              </div>
+              <p class="text-lg leading-relaxed max-w-2xl">
+                I architect and build the complex, data-intensive systems that power FinTech and InsurTech. My practice is built on a decade of experience translating extreme business requirements into resilient, scalable, and provably correct software.
+              </p>
+            </div>
           </div>
         </article>
       </section>
