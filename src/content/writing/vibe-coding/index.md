@@ -2,7 +2,7 @@
 title: "Vibe coding"
 description: "A reflection on vibe coding and its impact"
 date: "Apr 02 2025"
-draft: false
+draft: true
 ---
 
 It is somewhat of a rite of passage for a programmer to create a game. This journey can be both exhilarating and challenging, as it involves mastering various aspects of game development, from design and art to programming and testing.
