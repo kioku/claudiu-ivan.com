@@ -1,0 +1,18 @@
+---
+type Props = {
+  size?: 'small' | 'medium' | 'large';
+  class?: string;
+};
+
+const { size = 'medium', class: className = '' } = Astro.props;
+
+const sizeClasses = {
+  small: 'w-16 h-16 text-lg',
+  medium: 'w-20 h-20 text-xl',
+  large: 'w-24 h-24 text-2xl'
+};
+---
+
+<div class={`${sizeClasses[size]} ${className} flex items-center justify-center bg-black dark:bg-white text-white dark:text-black font-bold font-sans border-2 border-black dark:border-white`}>
+  <span class="tracking-tight">CI</span>
+</div>
