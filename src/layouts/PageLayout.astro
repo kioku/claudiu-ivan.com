@@ -3,7 +3,7 @@ import Head from "@components/Head.astro";
 import Header from "@components/Header.astro";
 import Footer from "@components/Footer.astro";
 import CodeBlock from "@components/CodeBlock.astro";
-import { SITE } from "@consts";
+import { SITE, HOME } from "@consts";
 
 type Props = {
   title: string;
@@ -21,7 +21,7 @@ const { title, description= "", showHeader = true, showFooter = true } = Astro.p
     <Head title={`${title} | ${SITE.NAME}`} description={description} />
   </head>
   <body>
-    {showHeader && <Header articleTitle={title} />}
+    {showHeader && <Header articleTitle={title != HOME.TITLE ? title : ''} />}
     <main>
       <slot />
     </main>

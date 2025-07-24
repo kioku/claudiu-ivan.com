@@ -9,8 +9,9 @@ export const SITE: Site = {
 };
 
 export const HOME: Metadata = {
-  TITLE: "Claudiu Ivan | Principal Architect, High-Performance Financial Platforms",
-  DESCRIPTION: "Specialist consultant and architect designing resilient, scalable, and data-intensive systems for the FinTech and InsurTech industries.",
+  TITLE: "Principal Architect of High-Performance Financial Platforms",
+  DESCRIPTION:
+    "Specialist consultant and architect designing resilient, scalable, and data-intensive systems for the FinTech and InsurTech industries.",
 };
 
 export const BLOG: Metadata = {
@@ -25,7 +26,8 @@ export const WORK: Metadata = {
 
 export const PROJECTS: Metadata = {
   TITLE: "Projects",
-  DESCRIPTION: "A collection of my projects, with links to repositories and demos.",
+  DESCRIPTION:
+    "A collection of my projects, with links to repositories and demos.",
 };
 
 export const SOCIALS: Socials = [
@@ -35,11 +37,10 @@ export const SOCIALS: Socials = [
   },
   {
     NAME: "bluesky",
-    HREF: "https://bsky.app/profile/claudiu-ivan.com"
-
+    HREF: "https://bsky.app/profile/claudiu-ivan.com",
   },
   {
     NAME: "github",
-    HREF: "https://github.com/kioku"
+    HREF: "https://github.com/kioku",
   },
 ];
