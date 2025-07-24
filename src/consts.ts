@@ -9,8 +9,8 @@ export const SITE: Site = {
 };
 
 export const HOME: Metadata = {
-  TITLE: "Home",
-  DESCRIPTION: "Principal Architect specializing in high-performance financial platforms. I architect and build complex, data-intensive systems that power FinTech and InsurTech.",
+  TITLE: "Claudiu Ivan | Principal Architect, High-Performance Financial Platforms",
+  DESCRIPTION: "Specialist consultant and architect designing resilient, scalable, and data-intensive systems for the FinTech and InsurTech industries.",
 };
 
 export const BLOG: Metadata = {
