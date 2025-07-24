@@ -1,22 +1,36 @@
 ---
 import Container from "@components/Container.astro";
+import Link from "@components/Link.astro";
 import { SITE } from "@consts";
-//import BackToTop from "@components/BackToTop.astro";
 
 const year = new Date().getFullYear();
-const copyrightLabel = [year, SITE.NAME].join(" | ");
 ---
 
-<footer>
+<footer class="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
   <Container>
-    <div class="relative">
-      <!--<div class="absolute right-0 -top-20">-->
-      <!--  <BackToTop />-->
-      <!--</div>-->
-    </div>
-    <div class="flex justify-center items-center">
-      <div>
-        &copy; {copyrightLabel}
+    <div class="space-y-6 text-center">
+      <div class="space-y-4">
+        <Link 
+          href="mailto:claudiu.ivan@me.com" 
+          aria-label="email" 
+          class="inline-block px-6 py-3 bg-black dark:bg-white text-white dark:text-black font-semibold border-2 border-black dark:border-white hover:bg-transparent hover:text-black dark:hover:bg-transparent dark:hover:text-white transition-colors duration-200"
+        >
+          claudiu.ivan@me.com
+        </Link>
+      </div>
+      
+      <hr class="border-gray-300 dark:border-gray-600 max-w-xs mx-auto" />
+      
+      <div class="flex justify-center gap-4 text-sm">
+        <Link href="https://github.com/kioku" aria-label="github" external>GitHub</Link>
+        <span class="text-gray-400">⋅</span>
+        <Link href="https://linkedin.com/in/claudiuivan" aria-label="linkedin" external>LinkedIn</Link>
+        <span class="text-gray-400">⋅</span>
+        <Link href="https://twitter.com/claudiuivan" aria-label="twitter" external>X (Twitter)</Link>
+      </div>
+      
+      <div class="text-sm text-gray-600 dark:text-gray-400">
+        &copy; {year} {SITE.NAME}
       </div>
     </div>
   </Container>
