@@ -10,7 +10,7 @@ export const SITE: Site = {
 
 export const HOME: Metadata = {
   TITLE: "Home",
-  DESCRIPTION: "Claudiu Ivan is a software engineering consultant focused on web technologies.",
+  DESCRIPTION: "Principal Architect specializing in high-performance financial platforms. I architect and build complex, data-intensive systems that power FinTech and InsurTech.",
 };
 
 export const BLOG: Metadata = {
