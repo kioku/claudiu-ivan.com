@@ -11,7 +11,7 @@ const { entry } = Astro.props;
 <a href={`/${entry.collection}/${entry.slug}`} class="flex cursor-pointer flex-col justify-between transition-all hover:text-stone-900 dark:hover:text-stone-100 sm:flex-row sm:items-center sm:px-2">
   <span class="shrink-0">{entry.data.title}</span>
   <span class="mx-8 hidden h-px w-full grow border-t border-dashed border-stone-600 sm:flex" />
-  <span class="shrink-0 text-slate8">
+  <span class="shrink-0">
     {entry.data.date?.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",

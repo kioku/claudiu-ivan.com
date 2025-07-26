@@ -87,8 +87,6 @@ const { title, description } = Astro.props;
 
 <script is:inline>
   function init() {
-    toggleTheme();
-
     const backToTop = document.getElementById("back-to-top");
     backToTop?.addEventListener("click", (event) => scrollToTop(event));
 
@@ -102,34 +100,6 @@ const { title, description } = Astro.props;
       top: 0,
       behavior: "smooth"
     });
-  }
-
-  function toggleTheme(themeStyle = "dark") {
-    const css = document.createElement("style");
-
-    css.appendChild(
-      document.createTextNode(
-        `* {
-             -webkit-transition: none !important;
-             -moz-transition: none !important;
-             -o-transition: none !important;
-             -ms-transition: none !important;
-             transition: none !important;
-          }
-        `,
-      )
-    );
-
-    document.head.appendChild(css);
-
-    if (themeStyle === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-
-    window.getComputedStyle(css).opacity;
-    document.head.removeChild(css);
   }
 
 
