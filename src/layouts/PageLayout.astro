@@ -21,7 +21,7 @@ const { title, description= "", showHeader = true, showFooter = true } = Astro.p
     <Head title={`${title} | ${SITE.NAME}`} description={description} />
   </head>
   <body>
-    {showHeader && <Header articleTitle={title != HOME.TITLE ? title : ''} />}
+    {showHeader && <Header articleTitle={title != HOME.TITLE ? title : ""} />}
     <main>
       <slot />
     </main>

@@ -1,15 +1,15 @@
 ---
 type Props = {
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
   class?: string;
 };
 
-const { size = 'medium', class: className = '' } = Astro.props;
+const { size = "medium", class: className = "" } = Astro.props;
 
 const sizeClasses = {
-  small: 'w-16 h-16 text-lg',
-  medium: 'w-20 h-20 text-xl',
-  large: 'w-24 h-24 text-2xl'
+  small: "w-16 h-16 text-lg",
+  medium: "w-20 h-20 text-xl",
+  large: "w-24 h-24 text-2xl"
 };
 ---
 
