@@ -7,26 +7,26 @@ draft: false
 
 My recent work requires giving AI agents consistent, secure, and configurable access to external APIs. This led me to build **Aperture**, a command-line tool written in Rust that transforms OpenAPI specifications into executable, self-documenting API clients. You can find the open-source project on [**GitHub**](https://github.com/kioku/aperture).
 
-The challenge begins when you need an agent to perform a real-world task like checking an issue status in Sentry, creating a ticket in Linear, or querying usage metrics. The approach of writing ad-hoc scripts for each integration creates systemic rot in any codebase: untracked security credentials scattered across environment files, zero discoverability of available operations, brittle error handling that fails silently, and a cognitive overhead that scales linearly with each new API. For an automated agent that needs programmatic certainty, this is architectural quicksand.
+The challenge begins when you need an agent to perform a real-world task like checking the status of an issue, creating a ticket, or querying usage metrics. The approach of writing ad-hoc scripts for each integration creates systemic rot in any codebase: untracked security credentials scattered across environment files, zero discoverability of available operations, brittle error handling that fails silently, and a cognitive overhead that scales linearly with each new API. For an automated agent that needs programmatic certainty and proper context management, this is architectural quicksand.
 
-A more structured approach involves protocols like MCP (Model Context Protocol), which provides a powerful client-server architecture for connecting models to tools. This is an excellent solution for stateful, persistent integrations. However, for many tasks involving single, ephemeral API calls, the overhead of maintaining a running server process is disproportionate to the need.
+A more structured approach involves protocols like MCP (Model Context Protocol), which provides a powerful client-server architecture for connecting models to tools. This is an excellent solution for stateful, persistent integrations. However, for many tasks involving single, ephemeral API calls, the overhead of maintaining a running server process is disproportionate to the task.
 
-I needed something different, a universal API adapter with the rigor of a protocol but the ergonomics and portability of a first-class CLI tool. The insight was to stop writing one-off clients and instead build a system that generates the client dynamically, based on the API's own blueprint.
+I needed something different, a universal API adapter with the rigor of a protocol but the ergonomics and portability of a CLI tool. The insight was to stop writing one-off clients and instead build a system that generates the client dynamically, based on the API's blueprint.
 
 ## The Blueprint and the Action
 
-The core philosophy of Aperture is the separation of the API's _specification_ from its _execution_. For almost every modern API, a machine-readable blueprint already exists in the OpenAPI specification. This document is the API's source of truth. Most developers see it as documentation. I saw it as a program waiting to be executed.
+The core philosophy of Aperture is the separation of the API's _specification_ from its _execution_. For almost every modern API, a machine-readable blueprint already exists in its OpenAPI specification. This document is the API's source of truth. Most developers see it as documentation. It can be seen as a program waiting to be executed.
 
 Aperture works in two distinct stages:
 
 1. **Cataloging the API:** You point Aperture at an OpenAPI specification just once. It ingests the document, validates it, and transforms it into a lean, optimized binary cache. The API is now cataloged.
-2. **Executing a Command:** When you (or an agent) run a command, Aperture loads the cached blueprint in milliseconds. It knows precisely how to construct the HTTP request, which parameters are required, and crucially, how to apply the correct security credentials.
+2. **Executing a Command:** When you (or an agent) run a command, Aperture loads the cached blueprint in milliseconds. It knows precisely how to construct the HTTP request, which parameters are required, and how to apply the correct security credentials.
 
 ## Security Model
 
-Aperture's security model has evolved significantly to solve a real-world problem: how do you use unmodified, third-party OpenAPI specifications while maintaining secure credential management?
+Aperture's security model has been designed to solve a real-world problem: how do you use unmodified, third-party OpenAPI specifications while maintaining secure credential management?
 
-The solution is elegant. Instead of requiring modifications to the OpenAPI spec itself, Aperture provides a dedicated command for secret configuration:
+The solution is quite elegant. Instead of requiring modifications to the OpenAPI spec itself, Aperture provides a dedicated command for secret configuration:
 
 ```bash
 # Configure the secret mapping once
@@ -47,7 +47,7 @@ Real APIs are messy. They have deprecated endpoints, experimental features, and 
 
 ### Partial Specification Acceptance
 
-The `--strict` flag embodies a philosophical view that perfect should not be the enemy of useful. By default, Aperture gracefully skips unsupported endpoints rather than rejecting an entire API specification. This means you can start using an API immediately, even if some endpoints use features Aperture doesn't yet support.
+The `--strict` flag embodies the philosophical view that perfect should not be the enemy of useful. By default, Aperture gracefully skips unsupported endpoints rather than rejecting an entire API specification. This means you can start using an API immediately, even if some endpoints use features Aperture doesn't yet support.
 
 ```bash
 # Load an API with experimental endpoints
@@ -73,7 +73,7 @@ APERTURE_ENV=staging aperture api myapi get-users
 
 ## Designed for Programmatic Certainty
 
-Building this tool with an AI as the primary user forced a level of programmatic explicitness that eliminates ambiguity for all users. When you design for a non-human user, you cannot rely on context clues, implicit understanding, or error recovery through intuition. This constraint creates better software.
+Building this tool with an AI as the primary user forced a level of explicitness that eliminates ambiguity for all users. When you design for a non-human user, you cannot rely on context clues, implicit understanding, or error recovery through intuition. This constraint creates better software.
 
 - **`--describe-json`:** This flag outputs a structured JSON manifest of every available command, parameter, and option for a given API. It serves as a self-documenting contract that allows any program, agent or script, to discover capabilities without documentation.
 - **`--json-errors`:** Errors become data structures. An agent can parse `{"error_type": "SecretNotSet", "env_var": "SENTRY_AUTH_TOKEN"}` and take corrective action, unlike an ambiguous HTTP status code.
@@ -108,7 +108,7 @@ This approach eliminates entire categories of integration bugs: malformed reques
 
 ## Try Aperture Today
 
-If you're building AI agent workflows, managing multiple API integrations, or simply tired of writing the same HTTP client code repeatedly, Aperture offers a fundamentally different approach. Clone the repository, point it at your first OpenAPI spec, and experience what systematic API interaction feels like.
+If you're building AI agent workflows, managing multiple API integrations, or simply tired of writing the same HTTP client code repeatedly, Aperture offers a fundamentally different approach. Run `cargo install aperture-cli`, point it at your first OpenAPI spec, and experience what systematic API interaction feels like.
 
 **[→ Get started with Aperture on GitHub](https://github.com/kioku/aperture)**
 
