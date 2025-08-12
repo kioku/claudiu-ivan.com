@@ -13,7 +13,7 @@ const { articleTitle } = Astro.props;
   <Container>
     <div class={`flex flex-wrap gap-y-2 ${articleTitle ? "justify-between items-center" : "justify-end"}`}>
       {articleTitle && (
-        <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300">
+        <div id="article-title" class="text-sm font-medium text-black dark:text-white transition-opacity duration-300" style="opacity: 0">
           {articleTitle}
         </div>
       )}
@@ -40,9 +40,22 @@ const { articleTitle } = Astro.props;
     }
   }
 
-  handleScroll();
+  function initializeScrollHandler() {
+    // Reset scroll position to top on new page navigation
+    window.scrollTo(0, 0);
 
-  window.addEventListener("scroll", handleScroll);
+    // Initialize the scroll handler
+    handleScroll();
+
+    // Add scroll listener
+    window.addEventListener("scroll", handleScroll);
+  }
+
+  // Initialize on initial page load
+  document.addEventListener("DOMContentLoaded", initializeScrollHandler);
+
+  // Re-initialize on view transitions
+  document.addEventListener("astro:page-load", initializeScrollHandler);
 
   // Cleanup on navigation
   document.addEventListener("astro:before-preparation", () => {
