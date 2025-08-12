@@ -25,19 +25,27 @@
     const preElements = document.querySelectorAll("article pre");
 
     preElements.forEach((pre) => {
-      if (!(pre instanceof HTMLElement) || pre.querySelector(".copy-button")) {
+      if (!(pre instanceof HTMLElement) || pre.closest(".code-block-wrapper")) {
         return;
       }
 
-      pre.classList.add("group");
-      pre.style.position = "relative";
+      // Create a wrapper div for positioning context
+      const wrapper = document.createElement("div");
+      wrapper.className = "code-block-wrapper relative group";
+
+      // Move pre element inside the wrapper
+      pre.parentNode?.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      // Add visual feedback for hover state
+      pre.classList.add("group-hover:opacity-90");
 
       const copyButton = document.createElement("button");
-      copyButton.className = "copy-button absolute w-8 h-8 top-2 right-2 p-2 text-sm hover:bg-gray-700/50 text-white rounded transition-colors duration-200 opacity-0 group-hover:opacity-100 flex items-center justify-center";
+      copyButton.className = "copy-button absolute w-8 h-8 top-2 right-2 p-2 text-sm hover:bg-gray-700/50 text-white rounded transition-colors duration-200 opacity-0 group-hover:opacity-100 flex items-center justify-center z-10";
       copyButton.innerHTML = COPY_ICON_SVG;
       copyButton.setAttribute("aria-label", "Copy code to clipboard");
 
-      pre.appendChild(copyButton);
+      wrapper.appendChild(copyButton);
     });
   }
 
@@ -52,7 +60,8 @@
     const copyButton = target.closest(".copy-button");
     if (!copyButton || !(copyButton instanceof HTMLButtonElement)) return;
 
-    const pre = copyButton.parentElement;
+    const wrapper = copyButton.parentElement;
+    const pre = wrapper?.querySelector("pre");
     const code = pre?.querySelector("code");
 
     if (!code?.textContent) return;
