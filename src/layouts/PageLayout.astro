@@ -3,6 +3,7 @@ import Head from "@components/Head.astro";
 import Header from "@components/Header.astro";
 import Footer from "@components/Footer.astro";
 import CodeBlock from "@components/CodeBlock.astro";
+import { ViewTransitions } from "astro:transitions";
 import { SITE, HOME } from "@consts";
 
 type Props = {
@@ -19,6 +20,7 @@ const { title, description= "", showHeader = true, showFooter = true } = Astro.p
 <html lang="en">
   <head>
     <Head title={`${title} | ${SITE.NAME}`} description={description} />
+    <ViewTransitions />
   </head>
   <body>
     {showHeader && <Header articleTitle={title != HOME.TITLE ? title : ""} />}
