@@ -99,7 +99,7 @@ aperture list-commands sentry
 
 # Execute commands
 aperture api sentry events list-an-organizations-issues \
-    --organization_id_or_slug my-org \
+    --organization-id-or-slug my-org \
     --query "is:unresolved" \
     --limit 1
 ```
@@ -111,4 +111,3 @@ This approach eliminates entire categories of integration bugs: malformed reques
 If you're building AI agent workflows, managing multiple API integrations, or simply tired of writing the same HTTP client code repeatedly, Aperture offers a fundamentally different approach. Run `cargo install aperture-cli`, point it at your first OpenAPI spec, and experience what systematic API interaction feels like.
 
 **[→ Get started with Aperture on GitHub](https://github.com/kioku/aperture)**
-
