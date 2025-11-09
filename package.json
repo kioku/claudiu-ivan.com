@@ -11,6 +11,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
+  "workspaces": [
+    "playground/*"
+  ],
   "dependencies": {
     "@astrojs/check": "^0.5.9",
     "@astrojs/mdx": "^2.2.0",
