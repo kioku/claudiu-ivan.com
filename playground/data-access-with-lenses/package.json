@@ -1,0 +1,21 @@
+{
+  "name": "data-access-with-lenses",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun index.ts",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "fast-check": "^4.1.1",
+    "vitest": "^3.1.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "immer": "^10.0.1"
+  }
+}
