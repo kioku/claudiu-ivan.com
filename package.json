@@ -9,7 +9,10 @@
     "preview:network": "astro preview --host",
     "astro": "astro",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "playground:test": "pnpm -r --filter './playground/*' test",
+    "playground:test:watch": "pnpm -r --filter './playground/*' test:watch",
+    "playground:build": "pnpm -r --filter './playground/*' build"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
