@@ -80,7 +80,7 @@ const defaultValue = unwrapOr(noFirst, 0);  // 0
 ```typescript
 import { ok, err, flatMap, match } from './result';
 
-function parseInt(str: string): Result<number, string> {
+function safeParseInt(str: string): Result<number, string> {
   const num = Number(str);
   if (Number.isNaN(num) || !Number.isInteger(num)) {
     return err(`Failed to parse "${str}" as integer`);
@@ -96,7 +96,7 @@ function validateRange(value: number, min: number, max: number): Result<number, 
 
 // Chaining operations (Railway-Oriented Programming)
 const result = flatMap(
-  parseInt("25"),
+  safeParseInt("25"),
   age => validateRange(age, 13, 120)
 );
 

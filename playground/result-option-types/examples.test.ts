@@ -4,7 +4,7 @@ import { ok, err } from "./result";
 import {
   first,
   last,
-  parseInt,
+  safeParseInt,
   parseJSON,
   parseDate,
   validateEmail,
@@ -41,20 +41,20 @@ describe("Examples", () => {
   });
 
   describe("Parsing", () => {
-    describe("parseInt", () => {
+    describe("safeParseInt", () => {
       it("should parse valid integer strings", () => {
-        expect(parseInt("42")).toEqual(ok(42));
-        expect(parseInt("-10")).toEqual(ok(-10));
-        expect(parseInt("0")).toEqual(ok(0));
+        expect(safeParseInt("42")).toEqual(ok(42));
+        expect(safeParseInt("-10")).toEqual(ok(-10));
+        expect(safeParseInt("0")).toEqual(ok(0));
       });
 
       it("should fail on invalid integer strings", () => {
-        const result = parseInt("abc");
+        const result = safeParseInt("abc");
         expect(result._tag).toBe("Err");
       });
 
       it("should fail on decimal strings", () => {
-        const result = parseInt("3.14");
+        const result = safeParseInt("3.14");
         expect(result._tag).toBe("Err");
       });
     });

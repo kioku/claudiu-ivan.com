@@ -12,6 +12,8 @@ Error handling and managing optional values represent fundamental challenges in 
 <Annotation>
   A companion playground project with complete implementations and comprehensive
   tests is available in this repository at `/playground/result-option-types/`.
+  Code examples throughout this article reference helper functions from the
+  companion modules: `option.ts`, `result.ts`, and `conversions.ts`.
 </Annotation>
 
 ## The Intrinsic Challenges of Traditional Error Handling
@@ -30,7 +32,8 @@ function findUserById(id: string): User | undefined {
   return users.find((u) => u.id === id);
 }
 
-// Caller must remember to check
+// Caller must remember to check—with strictNullChecks disabled,
+// this compiles but fails at runtime when user is undefined
 const user = findUserById("123");
 console.log(user.name); // Runtime error if user is undefined!
 
@@ -45,9 +48,11 @@ function parseConfig(json: string): Config {
 
 <Annotation>
   The `User | undefined` return type technically indicates potential absence,
-  but relying on developers to consistently check creates fragility. The type
-  system can help, but traditional patterns place the burden of correctness on
-  vigilance rather than structure.
+  but relying on developers to consistently check creates fragility. With
+  `strictNullChecks` enabled, TypeScript would catch the unsafe access above at
+  compile time. However, many codebases operate without strict null checking,
+  and even with it enabled, traditional patterns place the burden of correctness
+  on vigilance rather than structure.
 </Annotation>
 
 ## The Functional Approach: Making Absence and Failure Explicit
@@ -115,6 +120,20 @@ export function map<T, U>(option: Option<T>, fn: (value: T) => U): Option<U> {
 }
 
 /**
+ * Maps an Option<T> to Option<U> by applying a function that returns an Option.
+ * Flattens the nested Option<Option<U>> to Option<U>.
+ */
+export function flatMap<T, U>(
+  option: Option<T>,
+  fn: (value: T) => Option<U>,
+): Option<U> {
+  if (isSome(option)) {
+    return fn(option.value);
+  }
+  return none();
+}
+
+/**
  * Matches on an Option, executing the appropriate function based on its variant.
  */
 export function match<T, U>(
@@ -130,6 +149,12 @@ export function match<T, U>(
   return handlers.none();
 }
 ```
+
+<Annotation>
+  The `flatMap` operation (also known as `bind` or `chain`) is essential for
+  composing operations that themselves return Options. Use `map` when the
+  transformation returns a plain value; use `flatMap` when it returns an Option.
+</Annotation>
 
 ### Practical Application
 
@@ -249,7 +274,7 @@ The distinction between `map` and `flatMap` is crucial. Use `map` when the trans
 Unlike exceptions, Result's error type `E` is part of the type signature. This enables domain-specific error types:
 
 ```typescript
-type ParseError =
+type ValidationError =
   | { readonly kind: "InvalidFormat"; readonly input: string }
   | {
       readonly kind: "OutOfRange";
@@ -258,7 +283,7 @@ type ParseError =
       readonly max: number;
     };
 
-function parseInt(str: string): Result<number, ParseError> {
+function safeParseInt(str: string): Result<number, ValidationError> {
   const num = Number(str);
   if (Number.isNaN(num) || !Number.isInteger(num)) {
     return err({ kind: "InvalidFormat", input: str });
@@ -266,7 +291,7 @@ function parseInt(str: string): Result<number, ParseError> {
   return ok(num);
 }
 
-function validateAge(age: number): Result<number, ParseError> {
+function validateAge(age: number): Result<number, ValidationError> {
   if (age < 0 || age > 150) {
     return err({ kind: "OutOfRange", value: age, min: 0, max: 150 });
   }
@@ -274,7 +299,7 @@ function validateAge(age: number): Result<number, ParseError> {
 }
 ```
 
-The type system now tracks that these functions can fail with `ParseError`, and callers must handle both variants. This eliminates the surprise of unexpected exceptions.
+The type system now tracks that these functions can fail with `ValidationError`, and callers must handle both variants. This eliminates the surprise of unexpected exceptions.
 
 ## Operations and Composition
 
@@ -298,6 +323,21 @@ function validateEmail(email: string): Result<string, string> {
     : err(`Invalid email format: "${email}"`);
 }
 
+function safeParseInt(str: string): Result<number, string> {
+  const num = Number(str);
+  if (Number.isNaN(num) || !Number.isInteger(num)) {
+    return err(`Failed to parse "${str}" as integer`);
+  }
+  return ok(num);
+}
+
+function validateAge(age: number): Result<number, string> {
+  if (age < 0 || age > 150) {
+    return err(`Age ${age} is out of valid range (0-150)`);
+  }
+  return ok(age);
+}
+
 function validateNonEmpty(str: string): Result<string, string> {
   return str.trim().length > 0 ? ok(str) : err("String cannot be empty");
 }
@@ -308,7 +348,7 @@ function validateUserRegistration(
   username: string,
 ): Result<UserRegistration, string> {
   return flatMap(validateEmail(email), (validEmail) =>
-    flatMap(parseInt(ageStr), (age) =>
+    flatMap(safeParseInt(ageStr), (age) =>
       flatMap(validateAge(age), (validAge) =>
         flatMap(validateNonEmpty(username), (validUsername) =>
           ok({
@@ -383,12 +423,30 @@ const defaultValue = unwrapOr(noFirst, 0); // 0
 ### Parsing and Validation
 
 ```typescript
+function safeParseFloat(str: string): Result<number, string> {
+  const num = Number(str);
+  if (Number.isNaN(num)) {
+    return err(`Failed to parse "${str}" as float`);
+  }
+  return ok(num);
+}
+
+function validateRange(
+  value: number,
+  min: number,
+  max: number,
+): Result<number, string> {
+  if (value < min) return err(`Value ${value} is below minimum ${min}`);
+  if (value > max) return err(`Value ${value} is above maximum ${max}`);
+  return ok(value);
+}
+
 function parseCoordinates(
   latStr: string,
   lonStr: string,
 ): Result<Coordinates, string> {
-  return flatMap(parseFloat(latStr), (lat) =>
-    flatMap(parseFloat(lonStr), (lon) =>
+  return flatMap(safeParseFloat(latStr), (lat) =>
+    flatMap(safeParseFloat(lonStr), (lon) =>
       flatMap(validateRange(lat, -90, 90), (validLat) =>
         flatMap(validateRange(lon, -180, 180), (validLon) =>
           ok({ latitude: validLat, longitude: validLon }),

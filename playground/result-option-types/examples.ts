@@ -24,7 +24,7 @@ export function last<T>(array: readonly T[]): Option<T> {
  * Attempts to parse a string as an integer.
  * Returns Ok(number) if successful, Err(message) if parsing fails.
  */
-export function parseInt(str: string): Result<number, string> {
+export function safeParseInt(str: string): Result<number, string> {
   const num = Number(str);
   if (Number.isNaN(num) || !Number.isInteger(num)) {
     return err(`Failed to parse "${str}" as integer`);
@@ -116,7 +116,7 @@ export function validateUserRegistration(
   username: string
 ): Result<UserRegistration, string> {
   return flatMap(validateEmail(email), (validEmail) =>
-    flatMap(parseInt(ageStr), (age) =>
+    flatMap(safeParseInt(ageStr), (age) =>
       flatMap(validateRange(age, 13, 120), (validAge) =>
         flatMap(validateNonEmpty(username), (validUsername) =>
           ok({
@@ -184,8 +184,8 @@ export function parseCoordinates(
   latStr: string,
   lonStr: string
 ): Result<Coordinates, string> {
-  return flatMap(parseFloat(latStr), (lat) =>
-    flatMap(parseFloat(lonStr), (lon) =>
+  return flatMap(safeParseFloat(latStr), (lat) =>
+    flatMap(safeParseFloat(lonStr), (lon) =>
       flatMap(validateRange(lat, -90, 90), (validLat) =>
         flatMap(validateRange(lon, -180, 180), (validLon) =>
           ok({
@@ -198,7 +198,11 @@ export function parseCoordinates(
   );
 }
 
-function parseFloat(str: string): Result<number, string> {
+/**
+ * Attempts to parse a string as a floating-point number.
+ * Returns Ok(number) if successful, Err(message) if parsing fails.
+ */
+export function safeParseFloat(str: string): Result<number, string> {
   const num = Number(str);
   if (Number.isNaN(num)) {
     return err(`Failed to parse "${str}" as float`);

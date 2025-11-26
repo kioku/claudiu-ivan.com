@@ -169,11 +169,11 @@ export function zip<T1, T2, E>(
   result1: Result<T1, E>,
   result2: Result<T2, E>
 ): Result<[T1, T2], E> {
-  if (isOk(result1) && isOk(result2)) {
-    return ok([result1.value, result2.value]);
-  }
   if (isErr(result1)) {
-    return result1;
+    return err(result1.error);
   }
-  return result2 as Result<[T1, T2], E>;
+  if (isErr(result2)) {
+    return err(result2.error);
+  }
+  return ok([result1.value, result2.value]);
 }
