@@ -7,14 +7,9 @@ draft: false
 
 import Annotation from "@/components/Annotation.astro";
 
-Error handling and managing optional values represent fundamental challenges in software development, particularly in TypeScript where the type system provides powerful tools yet traditional approaches often undermine type safety. The conventional reliance on `null`, `undefined`, and exception-based control flow introduces subtle bugs, obscures intent, and creates maintenance burdens that compound as systems evolve. This article examines the **Option** and **Result** types—functional programming constructs that elevate absence and failure to first-class concerns within the type system. Drawing inspiration from Rust's principled approach to error handling, I present a TypeScript implementation that demonstrates how these patterns enable more robust, maintainable, and self-documenting code.
+Error handling and managing optional values represent fundamental challenges in software development. In TypeScript, the type system provides powerful tools, yet traditional approaches often undermine type safety. The conventional reliance on `null`, `undefined`, and exception-based control flow introduces subtle bugs, obscures intent, and creates maintenance burdens that compound as systems evolve.
 
-<Annotation>
-  A companion playground project with complete implementations and comprehensive
-  tests is available in this repository at `/playground/result-option-types/`.
-  Code examples throughout this article reference helper functions from the
-  companion modules: `option.ts`, `result.ts`, and `conversions.ts`.
-</Annotation>
+This article examines the **Option** and **Result** types—functional programming constructs that elevate absence and failure to first-class concerns within the type system. Drawing inspiration from Rust's principled approach to error handling, I present a TypeScript implementation that demonstrates how these patterns enable more robust, maintainable, and self-documenting code.
 
 ## The Intrinsic Challenges of Traditional Error Handling
 
@@ -46,14 +41,7 @@ function parseConfig(json: string): Config {
 // Caller cannot know to wrap in try/catch without reading implementation
 ```
 
-<Annotation>
-  The `User | undefined` return type technically indicates potential absence,
-  but relying on developers to consistently check creates fragility. With
-  `strictNullChecks` enabled, TypeScript would catch the unsafe access above at
-  compile time. However, many codebases operate without strict null checking,
-  and even with it enabled, traditional patterns place the burden of correctness
-  on vigilance rather than structure.
-</Annotation>
+With `strictNullChecks` enabled, TypeScript would catch the unsafe property access at compile time. However, many codebases operate without strict null checking, and even with it enabled, traditional patterns place the burden of correctness on vigilance rather than structure.
 
 ## The Functional Approach: Making Absence and Failure Explicit
 
@@ -271,7 +259,7 @@ The distinction between `map` and `flatMap` is crucial. Use `map` when the trans
 
 ### The Power of Typed Errors
 
-Unlike exceptions, Result's error type `E` is part of the type signature. This enables domain-specific error types:
+Unlike exceptions, Result's error type `E` is part of the type signature. This enables domain-specific error types that the compiler can track and enforce:
 
 ```typescript
 type ValidationError =
@@ -303,11 +291,11 @@ The type system now tracks that these functions can fail with `ValidationError`,
 
 ## Operations and Composition
 
-The true power of Option and Result emerges through composition. Both types form monads, enabling them to chain operations while maintaining error context.
+The true power of Option and Result emerges through composition. Both types form monads, enabling them to chain operations while maintaining error context. This section demonstrates the mechanics of chaining; we will return to typed error hierarchies in the Practical Applications section.
 
 ### Chaining with flatMap
 
-Consider validating user registration data:
+Consider validating user registration data. For clarity, we use string errors here to focus on the composition pattern itself:
 
 ```typescript
 interface UserRegistration {
@@ -363,13 +351,7 @@ function validateUserRegistration(
 }
 ```
 
-<Annotation>
-  This pattern—often called "Railway-Oriented Programming"—ensures that
-  processing stops at the first error while automatically propagating context.
-  Each `flatMap` only executes if the previous operation succeeded. If any
-  validation fails, the error propagates to the final Result without executing
-  subsequent validations.
-</Annotation>
+This pattern—often called "Railway-Oriented Programming"—ensures that processing stops at the first error while automatically propagating context. Each `flatMap` only executes if the previous operation succeeded. If any validation fails, the error propagates to the final Result without executing subsequent validations.
 
 ### Pattern Matching
 
@@ -398,7 +380,14 @@ TypeScript enforces that both cases are handled—forgetting the `err` handler p
 
 ## Practical Applications
 
-These types excel in scenarios where traditional approaches create fragility.
+With the core operations established, let us examine concrete scenarios where Option and Result improve upon traditional approaches. These examples demonstrate patterns you can apply directly in production code.
+
+<Annotation>
+  A companion playground project with complete implementations and comprehensive
+  tests is available in this repository at `/playground/result-option-types/`.
+  The examples below reference helper functions from the companion modules:
+  `option.ts`, `result.ts`, and `conversions.ts`.
+</Annotation>
 
 ### Safe Array Access
 
@@ -570,15 +559,15 @@ The `never` type appears when one variant is uninhabited, which is correct—a v
 
 ### Performance Considerations
 
-Creating wrapper objects incurs minimal overhead. Modern JavaScript engines optimize these patterns effectively. In performance-critical code, profile before optimizing—premature avoidance of these patterns often sacrifices correctness for negligible gains.
+A natural concern arises: does wrapping values in objects introduce meaningful overhead? In practice, modern JavaScript engines optimize small object allocations effectively, and the overhead is negligible for most applications.
 
-That said, avoiding excessive intermediate allocations matters in hot paths. Consider this optimization:
+That said, in genuinely hot paths—loops executing millions of times—you may choose to inline the pattern matching rather than chain multiple `flatMap` calls:
 
 ```typescript
-// Less efficient: creates intermediate Results
+// Idiomatic: clear and composable
 const result = flatMap(flatMap(flatMap(step1(), step2), step3), step4);
 
-// More efficient in very hot paths: early return
+// Optimized for hot paths: avoids intermediate allocations
 function process(): Result<T, E> {
   const r1 = step1();
   if (r1._tag === "Err") return r1;
@@ -593,7 +582,7 @@ function process(): Result<T, E> {
 }
 ```
 
-However, prioritize clarity unless profiling demonstrates a genuine bottleneck.
+This manual approach preserves the same semantics—early exit on first error—while reducing allocations. However, profile before optimizing; the clarity of `flatMap` chains is worth preserving unless measurements indicate a genuine bottleneck.
 
 ## Ecosystem Context
 
@@ -665,7 +654,7 @@ Readability matters more than cleverness.
 
 ## Path Forward
 
-The Option and Result types represent building blocks for broader functional patterns. Once comfortable with these fundamentals, several directions beckon:
+Having covered the fundamentals—type definitions, core operations, composition patterns, and practical trade-offs—where might you go from here? Option and Result serve as building blocks for broader functional patterns:
 
 **Railway-Oriented Programming**: Scott Wlaschin's pattern formalizes the error propagation demonstrated here, providing vocabulary and techniques for designing validation pipelines.
 
