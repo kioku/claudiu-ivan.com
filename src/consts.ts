@@ -9,14 +9,14 @@ export const SITE: Site = {
 };
 
 export const HOME: Metadata = {
-  TITLE: "Engineering Laboratory",
+  TITLE: "Principal System Architect",
   DESCRIPTION:
-    "The personal engineering laboratory of Claudiu Ivan. Exploring type theory, distributed systems, and deterministic architecture.",
+    "Technical writing by Claudiu Ivan on functional programming patterns, type-driven design, and building principled software systems.",
 };
 
 export const BLOG: Metadata = {
-  TITLE: "Engineering Notes",
-  DESCRIPTION: "Technical explorations in type theory, distributed systems, and deterministic architecture.",
+  TITLE: "Writing",
+  DESCRIPTION: "Technical explorations in functional programming patterns, type-driven design, and principled software systems.",
 };
 
 export const WORK: Metadata = {
