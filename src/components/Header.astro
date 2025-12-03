@@ -27,22 +27,31 @@ const { articleTitle } = Astro.props;
 </header>
 
 <script>
-  function handleScroll() {
-    const articleTitleDiv = document.getElementById("article-title");
-    if (!articleTitleDiv) {
-      return;
-    }
+  let ticking = false;
 
-    if (window.scrollY > 200) {
-      articleTitleDiv.style.opacity = "1";
-    } else {
-      articleTitleDiv.style.opacity = "0";
+  function handleScroll() {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const articleTitleDiv = document.getElementById("article-title");
+        if (articleTitleDiv) {
+          if (window.scrollY > 200) {
+            articleTitleDiv.style.opacity = "1";
+          } else {
+            articleTitleDiv.style.opacity = "0";
+          }
+        }
+        ticking = false;
+      });
+      ticking = true;
     }
   }
 
   function initializeScrollHandler() {
     // Reset scroll position to top on new page navigation
     window.scrollTo(0, 0);
+
+    // Reset ticking flag
+    ticking = false;
 
     // Initialize the scroll handler
     handleScroll();
@@ -60,5 +69,6 @@ const { articleTitle } = Astro.props;
   // Cleanup on navigation
   document.addEventListener("astro:before-preparation", () => {
     window.removeEventListener("scroll", handleScroll);
+    ticking = false;
   });
 </script>

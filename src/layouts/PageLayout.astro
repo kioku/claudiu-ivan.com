@@ -23,8 +23,9 @@ const { title, description= "", showHeader = true, showFooter = true } = Astro.p
     <ViewTransitions />
   </head>
   <body>
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
     {showHeader && <Header articleTitle={title != HOME.TITLE ? title : ""} />}
-    <main>
+    <main id="main-content">
       <slot />
     </main>
     {showFooter && <Footer />}
