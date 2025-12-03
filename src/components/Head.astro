@@ -65,11 +65,11 @@ const { title, description } = Astro.props;
 <meta property="og:site_name" content={config.author} />
 
 <!-- Twitter -->
-<meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:url" content={Astro.url} />
-<meta property="twitter:title" content={title} />
-<meta property="twitter:description" content={description} />
-<meta property="twitter:image" content={twitterImage} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={Astro.url} />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={twitterImage} />
 
 <meta name="astro-view-transitions-enabled" content="true">
 <meta name="astro-view-transitions-fallback" content="animate">

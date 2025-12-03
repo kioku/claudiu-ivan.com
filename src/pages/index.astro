@@ -66,6 +66,9 @@ const writing = (await getCollection("writing"))
           <h2 class="text-xl font-semibold text-black dark:text-gray-100">
             Writing
           </h2>
+          <a href="/writing" class="text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors">
+            View all →
+          </a>
         </div>
         <ul class="flex flex-col gap-4">
           {writing.map(post => (
