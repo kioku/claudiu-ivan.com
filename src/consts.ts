@@ -9,14 +9,14 @@ export const SITE: Site = {
 };
 
 export const HOME: Metadata = {
-  TITLE: "Principal Architect of High-Performance Financial Platforms",
+  TITLE: "Engineering Laboratory",
   DESCRIPTION:
-    "Specialist consultant and architect designing resilient, scalable, and data-intensive systems for the FinTech and InsurTech industries.",
+    "The personal engineering laboratory of Claudiu Ivan. Exploring type theory, distributed systems, and deterministic architecture.",
 };
 
 export const BLOG: Metadata = {
-  TITLE: "Writing",
-  DESCRIPTION: "A collection of articles that I have written.",
+  TITLE: "Engineering Notes",
+  DESCRIPTION: "Technical explorations in type theory, distributed systems, and deterministic architecture.",
 };
 
 export const WORK: Metadata = {
