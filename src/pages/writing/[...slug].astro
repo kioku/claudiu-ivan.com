@@ -17,9 +17,20 @@ type Props = CollectionEntry<"writing">;
 
 const post = Astro.props;
 const { Content } = await post.render();
+
+const articleUrl = new URL(Astro.url.pathname, Astro.site).toString();
 ---
 
-<PageLayout title={post.data.title} description={post.data.description}>
+<PageLayout
+  title={post.data.title}
+  description={post.data.description}
+  article={{
+    title: post.data.title,
+    description: post.data.description,
+    datePublished: post.data.date,
+    url: articleUrl
+  }}
+>
   <Container>
     <div class="space-y-1 my-10">
       <div class="flex items-center gap-1.5">

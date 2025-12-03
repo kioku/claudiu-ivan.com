@@ -11,15 +11,21 @@ type Props = {
   description?: string;
   showHeader?: boolean;
   showFooter?: boolean;
+  article?: {
+    title: string;
+    description: string;
+    datePublished: Date;
+    url: string;
+  };
 };
 
-const { title, description= "", showHeader = true, showFooter = true } = Astro.props;
+const { title, description= "", showHeader = true, showFooter = true, article } = Astro.props;
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <Head title={`${title} | ${SITE.NAME}`} description={description} />
+    <Head title={`${title} | ${SITE.NAME}`} description={description} article={article} />
     <ViewTransitions />
   </head>
   <body>

@@ -1,0 +1,55 @@
+---
+import { SITE } from "@consts";
+
+type Props = {
+  type: "person" | "article";
+  article?: {
+    title: string;
+    description: string;
+    datePublished: Date;
+    url: string;
+  };
+};
+
+const { type, article } = Astro.props;
+
+const personSchema = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: SITE.NAME,
+  url: Astro.site?.toString(),
+  email: `mailto:${SITE.EMAIL}`,
+  jobTitle: "Principal Architect",
+  description: "Specialist consultant and architect designing resilient, scalable, and data-intensive systems for the FinTech and InsurTech industries.",
+  sameAs: [
+    "https://github.com/kioku",
+    "https://linkedin.com/in/claudiuivan",
+    "https://twitter.com/claudiuivan",
+    "https://bsky.app/profile/claudiu-ivan.com"
+  ]
+};
+
+const articleSchema = article ? {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: article.title,
+  description: article.description,
+  author: {
+    "@type": "Person",
+    name: SITE.NAME,
+    url: Astro.site?.toString()
+  },
+  datePublished: article.datePublished.toISOString(),
+  url: article.url,
+  publisher: {
+    "@type": "Person",
+    name: SITE.NAME
+  }
+} : null;
+
+const schema = type === "person" ? personSchema : articleSchema;
+---
+
+{schema && (
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />
+)}

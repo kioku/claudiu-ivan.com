@@ -5,10 +5,17 @@ import "@fontsource/inter/latin-600.css";
 import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2";
 import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2";
 import Posthog from "./Posthog.astro";
+import StructuredData from "./StructuredData.astro";
 
 interface Props {
   title: string;
   description: string;
+  article?: {
+    title: string;
+    description: string;
+    datePublished: Date;
+    url: string;
+  };
 }
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -27,7 +34,7 @@ const config = {
   },
 };
 
-const { title, description } = Astro.props;
+const { title, description, article } = Astro.props;
 ---
 
 <!-- Global Metadata -->
@@ -106,5 +113,7 @@ const { title, description } = Astro.props;
   document.addEventListener("DOMContentLoaded", () => init());
   document.addEventListener("astro:after-swap", () => init());
 </script>
+
+<StructuredData type={article ? "article" : "person"} article={article} />
 
 <Posthog />
