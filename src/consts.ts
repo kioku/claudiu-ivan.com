@@ -11,12 +11,12 @@ export const SITE: Site = {
 export const HOME: Metadata = {
   TITLE: "Principal System Architect",
   DESCRIPTION:
-    "Technical writing by Claudiu Ivan on functional programming patterns, type-driven design, and building principled software systems.",
+    "Technical writing by Claudiu Ivan exploring the intersection of theory and practice in building robust software.",
 };
 
 export const BLOG: Metadata = {
   TITLE: "Writing",
-  DESCRIPTION: "Technical explorations in functional programming patterns, type-driven design, and principled software systems.",
+  DESCRIPTION: "Exploring the intersection of theory and practice in building robust software.",
 };
 
 export const WORK: Metadata = {
