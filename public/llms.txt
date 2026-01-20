@@ -1,0 +1,36 @@
+# Claudiu Ivan - Principal System Architect
+
+> Personal website of Claudiu Ivan, a Principal System Architect specializing
+> in type-driven development, distributed systems, and deterministic architecture.
+
+## About
+
+Claudiu Ivan is the founder of Software Foundry (https://softwarefoundry.ch),
+an architectural consulting practice for organizations building data-intensive
+platforms and mission-critical systems.
+
+## Expertise
+
+- System Architecture
+- Distributed Systems
+- Type Theory
+- Functional Programming
+- Platform Engineering
+- Data-Intensive Applications
+
+## Content
+
+- /writing/ - Technical articles on software architecture and engineering
+- /rss.xml - RSS feed for updates
+
+## Contact
+
+- Email: contact@claudiu-ivan.com
+- Twitter: https://twitter.com/claudiuivan
+- Bluesky: https://bsky.app/profile/claudiu-ivan.com
+- GitHub: https://github.com/kioku
+- LinkedIn: https://linkedin.com/in/claudiuivan
+
+## Related
+
+- Software Foundry: https://softwarefoundry.ch

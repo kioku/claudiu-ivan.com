@@ -26,7 +26,9 @@ const favicon16 = new URL("favicon-16x16.png", Astro.url.origin);
 const favicon32 = new URL("favicon-32x32.png", Astro.url.origin);
 const apple = new URL("apple-touch-icon.png", Astro.url.origin);
 const ogImage = new URL("og.png", Astro.url.origin);
-const twitterImage = new URL("twitter.png", Astro.url.origin);
+// Use OG image for Twitter as well - og.png is 1200x630 which works for summary_large_image
+// The previous twitter.png was 1024x1024 square which gets cropped awkwardly
+const twitterImage = ogImage;
 
 const config = {
   author: AUTHOR.NAME,
