@@ -1,5 +1,5 @@
-import { type Option, some, none, map as mapOption, flatMap as flatMapOption } from "./option";
-import { type Result, ok, err, map, flatMap } from "./result";
+import { type Option, flatMap as flatMapOption, unwrapOr as unwrapOrOption } from "./option";
+import { type Result, ok, err, flatMap } from "./result";
 import { fromNullable, tryCatch, arrayAt } from "./conversions";
 
 // --- Example 1: Safe Array Access with Option ---
@@ -156,14 +156,13 @@ export function getDatabaseHost(config: Config): Option<string> {
  * Safely extracts the database port with a default value.
  */
 export function getDatabasePort(config: Config): number {
-  return flatMapOption(
-    fromNullable(config.database),
-    (db) => fromNullable(db.port)
-  )._tag === "Some"
-    ? flatMapOption(fromNullable(config.database), (db) =>
-        fromNullable(db.port)
-      ).value
-    : 5432; // Default PostgreSQL port
+  return unwrapOrOption(
+    flatMapOption(
+      fromNullable(config.database),
+      (db) => fromNullable(db.port)
+    ),
+    5432
+  );
 }
 
 // --- Example 6: Combining Multiple Results ---
