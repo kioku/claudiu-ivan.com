@@ -20,7 +20,7 @@ The functional programming world solved this problem decades ago. The solution i
 This article examines **Option** and **Result** types in TypeScript. These are not new ideas. Rust, Haskell, Swift, and others have had them for years, and libraries like neverthrow bring them to TypeScript. But implementing them from scratch clarifies something important: the value is not the types themselves. It is making failure explicit in function signatures through compiler enforcement.
 
 <Annotation>
-**[Try it in StackBlitz →](/playground/result-option-types/)** The companion code implements everything discussed in this article from scratch. You can step through the type definitions, run the examples, and modify them to see how the compiler responds to missing error handling.
+**[Try it in StackBlitz →](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground/result-option-types)** The companion code implements everything discussed in this article from scratch. You can step through the type definitions, run the examples, and modify them to see how the compiler responds to missing error handling.
 </Annotation>
 
 **Want to skip the theory?** Run `npm install neverthrow`, read their README, and start using it. The library is mature, well-documented, and provides better ergonomics than rolling your own. The rest of this article explains why it works, which helps when you need to debug it or convince your team.
@@ -52,7 +52,7 @@ interface None {
 The `_tag` property enables TypeScript's discriminated union narrowing. When you check `option._tag === "Some"`, TypeScript refines the type to `Some<T>`, providing safe access to the `value` property.
 </Annotation>
 
-What makes Option useful is not the type itself but the operations: [`map`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L54) transforms the inner value if present, [`flatMap`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L66) chains operations that themselves return Options, and [`match`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L100) forces exhaustive handling of both cases.
+What makes Option useful is not the type itself but the operations: [`map`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/option.ts#L54) transforms the inner value if present, [`flatMap`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/option.ts#L66) chains operations that themselves return Options, and [`match`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/option.ts#L100) forces exhaustive handling of both cases.
 
 ```typescript
 function getUserEmail(id: string): Option<string> {
@@ -82,7 +82,7 @@ interface Err<E> {
 
 The critical difference from exceptions: the error type `E` is part of the function signature. Callers know exactly how a function can fail.
 
-Result supports the same operations as Option, with the addition of [`mapErr`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L69) for transforming errors while leaving success values alone.
+Result supports the same operations as Option, with the addition of [`mapErr`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/result.ts#L69) for transforming errors while leaving success values alone.
 
 ### Typed Errors
 
@@ -141,7 +141,7 @@ function validateRegistration(
 
 This pattern is sometimes called Railway-Oriented Programming. Success flows down one track, errors down another. Once you're on the error track, you stay there.
 
-The nested flatMap calls are not pretty. For production use, neverthrow provides method chaining ([`.andThen()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L84), [`.map()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L55), [`.mapErr()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L69)) that eliminates the nesting.
+The nested flatMap calls are not pretty. For production use, neverthrow provides method chaining ([`.andThen()`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/result.ts#L84), [`.map()`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/result.ts#L55), [`.mapErr()`](https://github.com/kioku/claudiu-ivan.com/blob/4aed9fe/playground/result-option-types/result.ts#L69)) that eliminates the nesting.
 
 ## When This Is Not Worth It
 

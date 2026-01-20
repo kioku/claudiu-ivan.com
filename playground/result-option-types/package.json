@@ -1,21 +1,16 @@
 {
   "name": "result-option-types",
-  "module": "index.ts",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "start": "bun index.ts",
-    "dev": "vitest --ui",
     "test": "vitest --run",
     "test:watch": "vitest",
     "build": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest",
     "fast-check": "^4.1.1",
+    "typescript": "^5.7.3",
     "vitest": "^3.1.4"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }
