@@ -1,0 +1,36 @@
+---
+// Annotation component for educational notes and insights within articles
+// Provides visual distinction from main content flow
+---
+
+<figure class="annotation" role="note">
+  <div class="annotation-content">
+    <slot />
+  </div>
+</figure>
+
+<style>
+  .annotation {
+    @apply my-4 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400;
+    @apply pl-4 pr-4 py-3 rounded-r;
+  }
+
+  .annotation-content {
+    @apply text-sm text-gray-700 dark:text-gray-300;
+    @apply leading-relaxed;
+  }
+
+  /* Preserve inline code styling within annotations */
+  .annotation-content :global(code) {
+    @apply bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs;
+  }
+
+  /* Preserve emphasis within annotations */
+  .annotation-content :global(em) {
+    @apply italic;
+  }
+
+  .annotation-content :global(strong) {
+    @apply font-semibold;
+  }
+</style>

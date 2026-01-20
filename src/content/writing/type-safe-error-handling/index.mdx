@@ -1,0 +1,241 @@
+---
+title: "Type-safe Error Handling"
+description: "Exploring Option and Result types in TypeScript, where missing error handling becomes a compile error instead of a production incident."
+date: "2026-01-20"
+draft: false
+---
+
+import Annotation from "@/components/Annotation.astro";
+
+There is a genre of production incident I have encountered more times than I care to count: a function returns null, the caller does not check, and somewhere downstream a calculation silently produces wrong data.
+
+The postmortem recommends "more careful code review." This is the software equivalent of "try harder next time." In my experience, code review catches maybe half of logic defects on a good day, and "did you remember to check for null on line 847" is not what human attention reliably catches at 4pm on a Thursday.
+
+In a reinsurance system I worked on, actuarial metrics stream in real-time: expected loss, share percentages, aggregate limits. Some metrics depend on others. A null propagating through those dependencies corrupts everything downstream. The system needed every absence to be explicit, every error to carry context. We treated errors as values, and the UI could render partial results with clear indicators of what was missing. The alternative would have been silent NaN cascading through financial projections.
+
+TypeScript nominally has a type system that should help here. In practice, it has gaps. Exceptions bypass the type system entirely. The signature of a function tells you nothing about whether it throws or what it throws. Nullable returns are marginally better: TypeScript marks the result as `T | undefined`, but the burden remains on developers to remember the check. In systems where an unhandled edge case means broken user experiences or incorrect data, "remember to check" is not an engineering strategy.
+
+The functional programming world solved this problem decades ago. The solution is almost disappointingly simple: make errors values that the type system tracks. If your function can fail, its return type says so. You cannot forget to handle the error case because the code does not compile until you do.
+
+This article examines **Option** and **Result** types in TypeScript. These are not new ideas. Rust, Haskell, Swift, and others have had them for years, and libraries like neverthrow bring them to TypeScript. But implementing them from scratch clarifies something important: the value is not the types themselves. It is making failure explicit in function signatures through compiler enforcement.
+
+<Annotation>
+**[Try it in StackBlitz →](/playground/result-option-types/)** The companion code implements everything discussed in this article from scratch. You can step through the type definitions, run the examples, and modify them to see how the compiler responds to missing error handling.
+</Annotation>
+
+**Want to skip the theory?** Run `npm install neverthrow`, read their README, and start using it. The library is mature, well-documented, and provides better ergonomics than rolling your own. The rest of this article explains why it works, which helps when you need to debug it or convince your team.
+
+## The Solution
+
+**Option\<T\>** represents a value that may or may not exist. Either `Some<T>` (containing a value) or `None` (explicitly representing absence).
+
+**Result\<T, E\>** represents an operation that may succeed with value `T` or fail with error `E`. The error type is part of the signature, tracked by the compiler, impossible to ignore.
+
+The insight: absence and failure are not exceptional. They are expected outcomes that deserve representation in the type system.
+
+## Option\<T\>
+
+```typescript
+type Option<T> = Some<T> | None;
+
+interface Some<T> {
+  readonly _tag: "Some";
+  readonly value: T;
+}
+
+interface None {
+  readonly _tag: "None";
+}
+```
+
+<Annotation>
+The `_tag` property enables TypeScript's discriminated union narrowing. When you check `option._tag === "Some"`, TypeScript refines the type to `Some<T>`, providing safe access to the `value` property.
+</Annotation>
+
+What makes Option useful is not the type itself but the operations: [`map`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L54) transforms the inner value if present, [`flatMap`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L66) chains operations that themselves return Options, and [`match`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/option.ts#L100) forces exhaustive handling of both cases.
+
+```typescript
+function getUserEmail(id: string): Option<string> {
+  return flatMap(findUserById(id), (user) => fromNullable(user.email));
+}
+```
+
+The None case propagates automatically. You cannot forget to handle it because flatMap handles it for you.
+
+## Result\<T, E\>
+
+Option handles absence. Result handles failure with context.
+
+```typescript
+type Result<T, E> = Ok<T> | Err<E>;
+
+interface Ok<T> {
+  readonly _tag: "Ok";
+  readonly value: T;
+}
+
+interface Err<E> {
+  readonly _tag: "Err";
+  readonly error: E;
+}
+```
+
+The critical difference from exceptions: the error type `E` is part of the function signature. Callers know exactly how a function can fail.
+
+Result supports the same operations as Option, with the addition of [`mapErr`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L69) for transforming errors while leaving success values alone.
+
+### Typed Errors
+
+This is where Result pays for itself:
+
+```typescript
+type ParseError =
+  | { readonly kind: "InvalidFormat"; readonly input: string }
+  | { readonly kind: "OutOfRange"; readonly value: number; readonly min: number; readonly max: number }
+  | { readonly kind: "Empty" };
+
+function parseAge(input: string): Result<number, ParseError> {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return err({ kind: "Empty" });
+
+  const num = Number(trimmed);
+  if (Number.isNaN(num) || !Number.isInteger(num)) {
+    return err({ kind: "InvalidFormat", input: trimmed });
+  }
+  if (num < 0 || num > 150) {
+    return err({ kind: "OutOfRange", value: num, min: 0, max: 150 });
+  }
+  return ok(num);
+}
+```
+
+The return type `Result<number, ParseError>` communicates everything a caller needs to know. TypeScript verifies that any switch on `error.kind` is exhaustive. Add a new error kind to `ParseError`, and every handler fails to compile until updated.
+
+When I added a `Timeout` case to an API error union on a recent project, TypeScript flagged every match statement that needed updating. The alternative would have been grepping for string matches, destructuring patterns, and aliased imports, then manually verifying each site. The compiler found them all in seconds.
+
+## Composition
+
+Individual operations are useful. Composition is where the pattern earns its keep.
+
+```typescript
+type RegistrationError =
+  | { readonly kind: "InvalidEmail"; readonly email: string }
+  | { readonly kind: "InvalidAge"; readonly input: string }
+  | { readonly kind: "AgeOutOfRange"; readonly age: number }
+  | { readonly kind: "EmptyUsername" };
+
+function validateRegistration(
+  email: string,
+  ageInput: string,
+  username: string
+): Result<User, RegistrationError> {
+  return flatMap(validateEmail(email), (validEmail) =>
+    flatMap(validateAge(ageInput), (validAge) =>
+      flatMap(validateUsername(username), (validUsername) =>
+        ok({ email: validEmail, age: validAge, username: validUsername })
+      )
+    )
+  );
+}
+```
+
+This pattern is sometimes called Railway-Oriented Programming. Success flows down one track, errors down another. Once you're on the error track, you stay there.
+
+The nested flatMap calls are not pretty. For production use, neverthrow provides method chaining ([`.andThen()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L84), [`.map()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L55), [`.mapErr()`](https://github.com/kioku/claudiu-ivan.com/blob/main/playground/result-option-types/result.ts#L69)) that eliminates the nesting.
+
+## When This Is Not Worth It
+
+These patterns have costs. Here's what adoption actually looks like:
+
+**Learning curve**: Your team will be productive with the basics in a day. Fluency with composition patterns takes about a week of real usage. Budget a sprint for the team to feel comfortable, not because the concepts are hard, but because the idioms are unfamiliar.
+
+**Syntax overhead**: Expect about 20% more lines in validation-heavy code. Method chaining reduces this.
+
+**Interop friction**: In a typical adoption, you'll wrap 5-10% of your codebase at system boundaries. The interior code that consumes Results is usually cleaner than what it replaced.
+
+These costs are shrinking. With agentic coding tools becoming standard, the learning curve compresses significantly. Agents handle boilerplate transformations and refactors with ease, especially when error types provide explicit context about what went wrong. The patterns that once required manual fluency now get suggested and applied automatically. Engineers still need to understand the model to review and debug, but the barrier to adoption is lower than it was even a year ago.
+
+Use these patterns when error handling is a significant source of bugs, when API boundaries need clear failure documentation, when you want the compiler to catch missing error handling during refactors.
+
+Use traditional approaches when the codebase is heavily procedural and conversion overhead dominates, when errors are truly exceptional and should crash the process, or when the team is not bought in.
+
+**Selling it internally**: The pitch to your tech lead is not "functional programming is elegant." The pitch is: "We had three production incidents last quarter from unhandled edge cases. This pattern makes that category of bug a compile error instead of a runtime surprise. The adoption cost is one sprint of learning curve. The payoff is fewer 2am pages."
+
+## Bridging Two Worlds
+
+Adoption means wrapping existing code at system boundaries. These two functions handle most conversions:
+
+```typescript
+// Convert nullable values to Option
+function fromNullable<T>(value: T | null | undefined): Option<T> {
+  return value == null ? none() : some(value);
+}
+
+// Convert exception-throwing code to Result
+function tryCatch<T>(fn: () => T): Result<T, Error> {
+  try {
+    return ok(fn());
+  } catch (error) {
+    return err(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+```
+
+<Annotation>
+Wrapping `JSON.parse` in `tryCatch` makes the signature honest about failure. It does not make it honest about the shape of success. For production code, pair this with runtime validation using a library like zod. The companion code also includes `tryCatchAsync` for Promise-based operations.
+</Annotation>
+
+## A Real-World Example
+
+```typescript
+type ApiError =
+  | { readonly kind: "NetworkError"; readonly message: string }
+  | { readonly kind: "NotFound"; readonly id: string }
+  | { readonly kind: "InvalidResponse"; readonly body: string }
+  | { readonly kind: "ValidationError"; readonly errors: ParseError[] };
+
+async function fetchUser(id: string): Promise<Result<UserData, ApiError>> {
+  const response = await tryCatchAsync(() => fetch(`/api/users/${id}`));
+  if (isErr(response)) {
+    return err({ kind: "NetworkError", message: response.error.message });
+  }
+
+  if (response.value.status === 404) {
+    return err({ kind: "NotFound", id });
+  }
+
+  const body = await tryCatchAsync(() => response.value.json());
+  if (isErr(body)) {
+    return err({ kind: "InvalidResponse", body: body.error.message });
+  }
+
+  return validateUserData(body.value);
+}
+```
+
+Every failure mode is explicit in the return type. Callers know exactly what can go wrong.
+
+### Error Modeling Is Still Your Job
+
+Result types make error handling explicit. They do not make your error modeling correct. Your `ApiError` union is only as good as your understanding of what can go wrong. When production teaches you that `InvalidResponse` actually has three sub-cases you need to handle differently, you'll need to refactor your error types.
+
+The good news: when you refactor the error union, the compiler tells you everywhere that needs updating. The bad news: you still have to get the taxonomy right in the first place, and production is often the teacher.
+
+## Conclusion
+
+If your system handles money, identity, or health data, you should be using typed errors. The cost of adoption is real but bounded: a sprint of learning curve, some syntax overhead, wrapper code at system boundaries. The cost of not adopting is unbounded and will eventually collect, usually at 2am, usually when the person who wrote the code is on vacation.
+
+Moving correctness guarantees from code review to the compiler means catching 100% of the defects the compiler knows about, every time, including at 4pm on a Thursday.
+
+**Monday morning**: Pick one function in your codebase that returns `T | undefined` and handles something that matters. Rewrite it with Result. See how it feels. If it clarifies the error handling, do another. If it doesn't, you've lost an hour. That's your pilot.
+
+If you're adopting these patterns at scale and want a second pair of eyes on your implementation strategy, [reach out](https://www.softwarefoundry.ch/#contact).
+
+## References
+
+- [Rust Option Documentation](https://doc.rust-lang.org/std/option/index.html)
+- [Rust Result Documentation](https://doc.rust-lang.org/std/result/index.html)
+- [neverthrow GitHub Repository](https://github.com/supermacro/neverthrow)
+- [fp-ts Documentation](https://gcanti.github.io/fp-ts/)
+- [Railway Oriented Programming](https://fsharpforfunandprofit.com/rop/) by Scott Wlaschin
+- [TypeScript Handbook: Narrowing](https://www.typescriptlang.org/docs/handbook/2/narrowing.html)
