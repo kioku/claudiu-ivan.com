@@ -1,5 +1,5 @@
 ---
-import { SITE } from "@consts";
+import { SITE, AUTHOR, SOFTWARE_FOUNDRY } from "@consts";
 
 type Props = {
   type: "person" | "article";
@@ -13,43 +13,102 @@ type Props = {
 
 const { type, article } = Astro.props;
 
+const siteUrl = Astro.site?.toString().replace(/\/$/, "") ?? "https://www.claudiu-ivan.com";
+
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": `${SOFTWARE_FOUNDRY.URL}/#organization`,
+  name: SOFTWARE_FOUNDRY.NAME,
+  url: SOFTWARE_FOUNDRY.URL,
+  description: SOFTWARE_FOUNDRY.DESCRIPTION,
+  founder: {
+    "@type": "Person",
+    "@id": `${siteUrl}/#person`,
+    name: AUTHOR.NAME,
+  },
+};
+
 const personSchema = {
   "@context": "https://schema.org",
   "@type": "Person",
-  name: SITE.NAME,
-  url: Astro.site?.toString(),
+  "@id": `${siteUrl}/#person`,
+  name: AUTHOR.NAME,
+  url: siteUrl,
   email: `mailto:${SITE.EMAIL}`,
-  jobTitle: "Principal Architect",
-  description: "Principal System Architect exploring type theory, distributed systems, and deterministic architecture through theoretical and practical implementations.",
+  jobTitle: AUTHOR.JOB_TITLE,
+  description: AUTHOR.DESCRIPTION,
+  knowsAbout: AUTHOR.EXPERTISE,
+  worksFor: {
+    "@type": "Organization",
+    "@id": `${SOFTWARE_FOUNDRY.URL}/#organization`,
+    name: SOFTWARE_FOUNDRY.NAME,
+    url: SOFTWARE_FOUNDRY.URL,
+  },
   sameAs: [
+    SOFTWARE_FOUNDRY.URL,
     "https://github.com/kioku",
     "https://linkedin.com/in/claudiuivan",
     "https://twitter.com/claudiuivan",
-    "https://bsky.app/profile/claudiu-ivan.com"
-  ]
+    "https://bsky.app/profile/claudiu-ivan.com",
+  ],
 };
 
-const articleSchema = article ? {
+const articleSchema = article
+  ? {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: article.title,
+      description: article.description,
+      author: {
+        "@type": "Person",
+        "@id": `${siteUrl}/#person`,
+        name: AUTHOR.NAME,
+        url: siteUrl,
+      },
+      datePublished: article.datePublished.toISOString(),
+      url: article.url,
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": article.url,
+      },
+      publisher: {
+        "@type": "Person",
+        "@id": `${siteUrl}/#person`,
+        name: AUTHOR.NAME,
+      },
+      image: `${siteUrl}/og.png`,
+    }
+  : null;
+
+const webSiteSchema = {
   "@context": "https://schema.org",
-  "@type": "Article",
-  headline: article.title,
-  description: article.description,
+  "@type": "WebSite",
+  "@id": `${siteUrl}/#website`,
+  name: AUTHOR.NAME,
+  url: siteUrl,
+  description: AUTHOR.DESCRIPTION,
   author: {
     "@type": "Person",
-    name: SITE.NAME,
-    url: Astro.site?.toString()
+    "@id": `${siteUrl}/#person`,
   },
-  datePublished: article.datePublished.toISOString(),
-  url: article.url,
-  publisher: {
-    "@type": "Person",
-    name: SITE.NAME
-  }
-} : null;
+};
 
-const schema = type === "person" ? personSchema : articleSchema;
+const schemas =
+  type === "person"
+    ? [personSchema, organizationSchema, webSiteSchema]
+    : [articleSchema, personSchema];
 ---
 
-{schema && (
-  <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />
-)}
+{
+  schemas.map(
+    (schema) =>
+      schema && (
+        <script
+          is:inline
+          type="application/ld+json"
+          set:html={JSON.stringify(schema)}
+        />
+      )
+  )
+}

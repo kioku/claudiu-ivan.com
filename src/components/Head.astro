@@ -6,6 +6,7 @@ import inter400 from "@fontsource/inter/files/inter-latin-400-normal.woff2";
 import inter600 from "@fontsource/inter/files/inter-latin-600-normal.woff2";
 import Posthog from "./Posthog.astro";
 import StructuredData from "./StructuredData.astro";
+import { AUTHOR } from "@consts";
 
 interface Props {
   title: string;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
 
 const favicon16 = new URL("favicon-16x16.png", Astro.url.origin);
 const favicon32 = new URL("favicon-32x32.png", Astro.url.origin);
@@ -27,7 +29,8 @@ const ogImage = new URL("og.png", Astro.url.origin);
 const twitterImage = new URL("twitter.png", Astro.url.origin);
 
 const config = {
-  author: "Claudiu Ivan",
+  author: AUTHOR.NAME,
+  twitterHandle: AUTHOR.TWITTER_HANDLE,
   verification: {
     google: "XHtlMzh4rtF0BX73TQZtxFUtaDw3fBcDFNy7sJixems",
     bing: "B08B038A701BDB776D8BCC3BC84D5BD3",
@@ -35,6 +38,7 @@ const config = {
 };
 
 const { title, description, article } = Astro.props;
+const ogType = article ? "article" : isHomePage ? "profile" : "website";
 ---
 
 <!-- Global Metadata -->
@@ -64,15 +68,18 @@ const { title, description, article } = Astro.props;
 <meta name="description" content={description} />
 
 <!-- Open Graph / Facebook -->
-<meta property="og:type" content="website" />
+<meta property="og:type" content={ogType} />
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:image" content={ogImage} />
 <meta property="og:site_name" content={config.author} />
+{isHomePage && <meta property="profile:username" content="claudiuivan" />}
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content={config.twitterHandle} />
+<meta name="twitter:creator" content={config.twitterHandle} />
 <meta name="twitter:url" content={Astro.url} />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />

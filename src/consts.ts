@@ -8,15 +8,39 @@ export const SITE: Site = {
   NUM_PROJECTS_ON_HOMEPAGE: 0,
 };
 
+export const AUTHOR = {
+  NAME: "Claudiu Ivan",
+  JOB_TITLE: "Principal System Architect",
+  DESCRIPTION:
+    "Principal System Architect specializing in type-driven development, distributed systems, and deterministic architecture. Founder of Software Foundry, providing architectural consulting for data-intensive platforms.",
+  EXPERTISE: [
+    "System Architecture",
+    "Distributed Systems",
+    "Type Theory",
+    "Functional Programming",
+    "Platform Engineering",
+    "Data-Intensive Applications",
+  ],
+  TWITTER_HANDLE: "@claudiuivan",
+};
+
+export const SOFTWARE_FOUNDRY = {
+  NAME: "Software Foundry",
+  URL: "https://softwarefoundry.ch",
+  DESCRIPTION:
+    "Architectural consulting practice specializing in mission-critical platform development for organizations building data-intensive systems.",
+};
+
 export const HOME: Metadata = {
   TITLE: "Principal System Architect",
   DESCRIPTION:
-    "Technical writing by Claudiu Ivan exploring the intersection of theory and practice in building robust software.",
+    "Claudiu Ivan is a Principal System Architect specializing in type-driven development and distributed systems. Founder of Software Foundry, providing architectural consulting for data-intensive platforms.",
 };
 
 export const BLOG: Metadata = {
   TITLE: "Writing",
-  DESCRIPTION: "Exploring the intersection of theory and practice in building robust software.",
+  DESCRIPTION:
+    "Technical articles by Claudiu Ivan on type-driven development, distributed systems, and software architecture.",
 };
 
 export const WORK: Metadata = {
