@@ -21,7 +21,7 @@
     "@astrojs/sitemap": "^3.4.1",
     "@astrojs/tailwind": "^6.0.2",
     "@eslint/js": "^9.32.0",
-    "@fontsource/inter": "^5.2.6",
+    "@fontsource/archivo": "^5.2.8",
     "@tailwindcss/typography": "^0.5.10",
     "@typescript-eslint/eslint-plugin": "^8.37.0",
     "@typescript-eslint/parser": "^8.37.0",
