@@ -38,7 +38,7 @@ describe("Examples", () => {
     });
 
     it("parseJSON handles valid and invalid input", () => {
-      expect(parseJSON<{ a: number }>('{"a": 1}')).toEqual(ok({ a: 1 }));
+      expect(parseJSON<{ a: number }>(`{"a": 1}`)).toEqual(ok({ a: 1 }));
       expect(parseJSON("{invalid}")._tag).toBe("Err");
     });
 
