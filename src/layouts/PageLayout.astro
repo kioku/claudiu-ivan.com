@@ -3,7 +3,7 @@ import Head from "@components/Head.astro";
 import Header from "@components/Header.astro";
 import Footer from "@components/Footer.astro";
 import CodeBlock from "@components/CodeBlock.astro";
-import { ViewTransitions } from "astro:transitions";
+import { ClientRouter } from "astro:transitions";
 import { SITE, HOME } from "@consts";
 
 type Props = {
@@ -26,7 +26,7 @@ const { title, description= "", showHeader = true, showFooter = true, article } 
 <html lang="en">
   <head>
     <Head title={`${title} | ${SITE.NAME}`} description={description} article={article} />
-    <ViewTransitions />
+    <ClientRouter />
   </head>
   <body>
     <a href="#main-content" class="skip-to-content">Skip to main content</a>

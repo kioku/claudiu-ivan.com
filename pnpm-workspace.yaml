@@ -1,2 +1,6 @@
 packages:
-  - 'playground/*'
+  - playground/*
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
