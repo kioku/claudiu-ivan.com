@@ -5,7 +5,7 @@
 
 ## About
 
-Claudiu Ivan is the founder of Software Foundry (https://softwarefoundry.ch),
+Claudiu Ivan is the founder of Software Foundry (https://www.softwarefoundry.ch),
 an architectural consulting practice for organizations building data-intensive
 platforms and mission-critical systems.
 
@@ -33,4 +33,4 @@ platforms and mission-critical systems.
 
 ## Related
 
-- Software Foundry: https://softwarefoundry.ch
+- Software Foundry: https://www.softwarefoundry.ch

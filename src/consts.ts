@@ -26,7 +26,7 @@ export const AUTHOR = {
 
 export const SOFTWARE_FOUNDRY = {
   NAME: "Software Foundry",
-  URL: "https://softwarefoundry.ch",
+  URL: "https://www.softwarefoundry.ch",
   DESCRIPTION:
     "Architectural consulting practice specializing in mission-critical platform development for organizations building data-intensive systems.",
 };
