@@ -175,7 +175,7 @@ So far the lens shape is purely typed and every focus is known at compile time. 
 
 ## Runtime-Configured Lenses
 
-Enterprise systems often have formula engines, configurable forms, import mappings, reporting tokens, and client-specific data models. Hard-coding every path in application logic does not scale across products and clients. A token like `IRS.Notional` or `Option.Strike` should resolve to the right value in the current data structure.
+Enterprise systems often have formula engines, configurable forms, import mappings, and client-specific data models. Hard-coding every path in application logic does not scale across products and clients. The usual solution is to introduce **tokens**: stable, human-readable names for domain concepts such as `IRS.Notional`, `Option.Strike`, or `Policy.Premium`. Formulas, reports, and import mappings reference the token; configuration maps each token to a concrete path on the current data structure. A lens is what walks that path.
 
 A minimal configuration needs the source type, target type, and path:
 
