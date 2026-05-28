@@ -7,9 +7,7 @@ draft: false
 
 import Annotation from "@/components/Annotation.astro";
 
-There is a kind of code review comment I have written too many times: "this update mutates the original object." It usually appears in a harmless-looking change. Someone needs to update a field three levels down in a data structure, spreads the top-level object, changes the nested value, and misses one of the intermediate copies.
-
-The developer may have been careful and still missed the invariant. The code asked a person to preserve something the type system could have helped with.
+Updating a field several levels into a nested immutable object means spreading every level above it, replacing the target value, and reassembling the structure by hand. If any of the intermediate spreads is missing, the returned object shares a reference with the original at that level, and a later update will mutate both copies. The compiler does not detect this, and code review catches it inconsistently.
 
 In financial systems this shows up constantly. Instruments like swaps, options, policies, portfolios, and valuation contexts are naturally nested. The same is true outside finance: claims processing, logistics, document workflows, entitlement models, product catalogs. Once the domain gets real, the objects stop being flat.
 
