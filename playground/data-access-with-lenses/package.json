@@ -16,6 +16,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "immer": "^10.0.1"
+    "immer": "^10.0.1",
+    "result-option-types": "workspace:*"
   }
 }

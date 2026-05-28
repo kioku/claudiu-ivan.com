@@ -1,13 +1,20 @@
+import { type Result, ok, err, isErr } from "result-option-types";
+
 /**
- * Represents the result of a Lens view operation.
+ * The result of a Lens view operation. Aliased to make lens signatures
+ * read at a glance; structurally identical to Result<A, string>.
  */
-export type ViewResult<A> =
-  | { readonly success: true; readonly value: A }
-  | { readonly success: false; readonly error: string };
+export type ViewResult<A> = Result<A, string>;
+
+/**
+ * The result of a Lens set operation. Set can fail on configured lenses
+ * when the configured path does not exist in the source.
+ */
+export type SetResult<S> = Result<S, string>;
 
 export interface Lens<S, A> {
   readonly view: (source: S) => ViewResult<A>;
-  readonly set: (source: S, newValue: A) => S;
+  readonly set: (source: S, newValue: A) => SetResult<S>;
 }
 
 /**
@@ -17,19 +24,19 @@ export function lensProp<S, K extends keyof S>(prop: K): Lens<S, S[K]> {
   return {
     view: (source: S): ViewResult<S[K]> => {
       if (source && typeof source === "object" && prop in source) {
-        return { success: true, value: source[prop] };
+        return ok(source[prop]);
       }
-      return {
-        success: false,
-        error: `Property '${String(prop)}' not found on source object.`,
-      };
+      return err(`Property '${String(prop)}' not found on source object.`);
     },
-    set: (source: S, newValue: S[K]): S => ({ ...source, [prop]: newValue }),
+    set: (source: S, newValue: S[K]): SetResult<S> =>
+      ok({ ...source, [prop]: newValue }),
   };
 }
 
 /**
- * Composes two lenses together.
+ * Composes two lenses together. A composed set fails if either the outer
+ * view or the inner set fails; the failure is returned as Err rather
+ * than thrown.
  */
 export function composeLens<S, B, A>(
   outer: Lens<S, B>,
@@ -37,20 +44,22 @@ export function composeLens<S, B, A>(
 ): Lens<S, A> {
   return {
     view: (source: S): ViewResult<A> => {
-      const outerResult = outer.view(source);
-      if (!outerResult.success) {
-        return outerResult;
+      const outerView = outer.view(source);
+      if (isErr(outerView)) {
+        return outerView;
       }
-      return inner.view(outerResult.value);
+      return inner.view(outerView.value);
     },
-    set: (source: S, newValue: A): S => {
-      const outerResult = outer.view(source);
-      if (!outerResult.success) {
-        throw new Error(
-          `Cannot compose set: outer lens failed to view. Error: ${outerResult.error}`
-        );
+    set: (source: S, newValue: A): SetResult<S> => {
+      const outerView = outer.view(source);
+      if (isErr(outerView)) {
+        return outerView;
       }
-      return outer.set(source, inner.set(outerResult.value, newValue));
+      const innerSet = inner.set(outerView.value, newValue);
+      if (isErr(innerSet)) {
+        return innerSet;
+      }
+      return outer.set(source, innerSet.value);
     },
   };
 }
