@@ -229,22 +229,22 @@ A production version needs to answer several questions explicitly:
 - Who validates that `targetType` matches the actual runtime value?
 - Are generated lenses cached, or rebuilt on every call?
 
-The runtime version of `view` returns a [`Result`](/writing/type-safe-error-handling) instead of pretending every path lookup succeeds:
+The companion implementation returns a [`Result`](/writing/type-safe-error-handling)-shaped value instead of pretending every path lookup succeeds:
 
 ```typescript
-type Result<T, E> =
-  | { readonly success: true; readonly value: T }
-  | { readonly success: false; readonly error: E };
+type ViewResult<A> =
+  | { readonly success: true; readonly value: A }
+  | { readonly success: false; readonly error: string };
 
 interface Lens<S, A> {
-  readonly view: (source: S) => Result<A, string>;
+  readonly view: (source: S) => ViewResult<A>;
   readonly set: (source: S, newValue: A) => S;
 }
 ```
 
-The pure lens definition is shorter. The runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path. A `string` error keeps the lens itself focused on a single concern; the formula engine in the next section carries a typed error union, and a production version would add the configured path, the offending segment, and the source type for richer logs.
+`ViewResult<A>` is structurally `Result<A, string>`. The formula engine in the next section uses a discriminated union of failure modes instead of a bare string; a production version would extend each variant with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
 
-Once `view` returns a `Result`, a configuration-driven formula engine becomes a reasonable thing to build on top.
+Once `view` returns a `ViewResult`, a configuration-driven formula engine becomes a reasonable thing to build on top.
 
 ## A Token-Driven Formula Engine
 
