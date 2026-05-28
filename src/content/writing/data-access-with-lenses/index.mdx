@@ -216,7 +216,7 @@ function createLensFromConfig<S extends object, A>(
 }
 ```
 
-Generated lenses lose some of the guarantees that made the hand-written version attractive. A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is valid for `IRS`, or that the value at the end is a number, or that the rate is actually the `Floating` variant when you get there. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
+Generated lenses lose some of the guarantees that made the hand-written version attractive. A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is a valid path for `IRS`, that the value at the end is a number, or that the rate is in the `Floating` variant by the time it is reached. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
 
 Configuration-driven access can still be the right design, but the inputs have to be treated as untrusted.
 
@@ -293,7 +293,7 @@ function evaluateFormula(
 }
 ```
 
-The separation keeps formulas focused on business logic, lens configuration focused on data locations, and validation focused on bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and explicit failures.
+Formulas hold the business logic, lens configuration locates the data, and validation catches bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and explicit failures.
 
 That separation also opens a question the typed version never had to answer: who owns the tokens, and what happens when their underlying paths change?
 
@@ -326,7 +326,7 @@ Lenses focus on a part that exists.
 
 A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. **Prisms** focus on one possible variant of a larger type.
 
-Arrays and collections need a different abstraction. Updating every leg, every cashflow, or every matching row is what **traversals** are for.
+Arrays and collections need a different abstraction. Updating every leg, cashflow, or matching row is what **traversals** are for.
 
 Implementing all of these from scratch is rarely worth it. For production-grade optics in TypeScript, [`monocle-ts`](https://gcanti.github.io/monocle-ts/) is the reference implementation. For path-based access with weaker type guarantees, Ramda's [`lensPath`](https://ramdajs.com/docs/#lensPath) may be sufficient.
 
