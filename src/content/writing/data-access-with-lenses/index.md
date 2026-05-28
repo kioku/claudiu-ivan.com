@@ -1,113 +1,90 @@
 ---
 title: "Composable Data Access with Lenses"
-description: "This article explores the Lens pattern, a functional programming technique providing an approach to accessing and manipulating nested, immutable data structures, with applications in modeling financial derivatives."
+description: "How lenses make nested immutable updates explicit, reusable, and testable without turning ordinary TypeScript into a functional programming ceremony."
 date: "2025-05-02"
-draft: true
+draft: false
 ---
 
-Modern financial applications, particularly those grappling with the intricacies of derivatives, frequently model complex instruments using deeply nested data structures. Adhering to immutability—a cornerstone for predictable state management, auditability, and simplified concurrency—is paramount in such systems. However, interacting with these immutable structures, specifically updating nested fields, presents significant practical challenges. Traditional methods involving direct property access and manual deep cloning become verbose, fragile, and obscure the core intent, hindering maintainability. This article delves into the **Lens pattern**, a concept originating from functional programming, which offers a composable, type-safe, and remarkably elegant solution. We will explore the core principles underpinning Lenses, demonstrate their implementation in TypeScript, and illustrate their application in the demanding domain of financial derivatives modeling, ultimately presenting a *principled approach* to this data management challenge.
+There is a kind of code review comment I have written too many times: "this update mutates the original object." It usually appears in a harmless-looking change. Someone needs to update a field three levels down in a data structure, spreads the top-level object, changes the nested value, and misses one of the intermediate copies.
 
-## The Intrinsic Challenges of Immutability and Deeply Nested Structures
+The bug is not that the developer failed to be careful enough. The bug is that the code asked a human to manually preserve an invariant the type system could have helped with.
 
-The benefits of immutability in building robust software are well-established. Yet, the practicalities of updating deeply nested fields within immutable structures can lead to cumbersome code. Consider these simplified TypeScript representations of an Interest Rate Swap (IRS) and a European Call Option, common instruments in finance:
+In financial systems this shows up constantly. Instruments like swaps, options, policies, portfolios, and valuation contexts are naturally nested. The same is true outside finance: claims processing, logistics, document workflows, entitlement models, product catalogs. Once the domain gets real, the objects stop being flat.
+
+Immutability helps because it makes state changes predictable. It is easier to audit, easier to test, and safer under concurrency. But immutability has a practical cost: updating deeply nested data can become noisy enough that the intent disappears.
+
+This article looks at **lenses**, a small functional programming idea that gives us a reusable way to focus on part of a larger structure. The point is not to make TypeScript look like Haskell. The point is to stop rewriting the same fragile object-copying code by hand.
+
+The complete companion code, including tests, is available in the [data-access-with-lenses playground](https://github.com/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses). The snippets below start with the minimal form because it is easier to understand; the companion code makes failure more explicit once runtime configuration enters the picture.
+
+## The Problem
+
+Consider a simplified interest rate swap:
 
 ```typescript
-// --- Data Structures ---
-
 interface IRS {
   readonly id: string;
   readonly notionalAmount: number;
   readonly fixedLeg: Leg;
   readonly floatingLeg: Leg;
-  // ... other relevant properties like currency, effective date, etc.
 }
 
 interface Leg {
-  readonly paymentFrequency: string; // e.g., "Quarterly", "Semi-Annually"
-  readonly dayCountConvention: string; // e.g., "30/360", "Actual/365"
+  readonly paymentFrequency: string;
+  readonly dayCountConvention: string;
   readonly rate: Rate;
-  // ... other leg-specific properties like payment dates, accrual periods
 }
 
-// Discriminated union for rate types
 type Rate = FixedRate | FloatingRate;
 
 interface FixedRate {
-  readonly type: 'Fixed';
-  readonly value: number; // The fixed rate percentage
+  readonly type: "Fixed";
+  readonly value: number;
 }
 
 interface FloatingRate {
-  readonly type: 'Floating';
-  readonly index: string; // e.g., "LIBOR", "SOFR"
-  readonly spread: number; // Spread over the index, often in basis points or percentage
-  // ... other properties like fixing dates, reset frequency
-}
-
-interface EuropeanCallOption {
-    readonly id: string;
-    readonly underlying: string; // e.g., "AAPL", "EURUSD"
-    readonly strike: number;
-    readonly expiry: number; // Unix timestamp or Date object
-    readonly style: 'European';
-    // ... other option properties like premium, valuation date
+  readonly type: "Floating";
+  readonly index: string;
+  readonly spread: number;
 }
 ```
-*(Annotation: The use of `readonly` enforces immutability at the type level, a compile-time safeguard.)*
 
-Modifying, for instance, the `spread` on the `floatingLeg` of an `IRS` immutably requires manually reconstructing the object graph, cloning each layer from the target property back up to the root:
+If we want to update the spread on the floating leg without mutating the original object, the direct implementation looks like this:
 
 ```typescript
-// Manual, Immutable Update (Illustrative)
 function updateSpreadManually(irs: IRS, newSpread: number): IRS {
-  // Guard: Ensure we are dealing with a floating rate leg
-  if (irs.floatingLeg.rate.type !== 'Floating') {
-    return irs; // Return original if not applicable
+  if (irs.floatingLeg.rate.type !== "Floating") {
+    return irs;
   }
 
-  // Create new rate with updated spread
-  const updatedFloatingRate: FloatingRate = {
-    ...irs.floatingLeg.rate, // Copy existing FloatingRate properties
-    spread: newSpread,       // Update the spread
-  };
-
-  // Create new leg with updated rate
-  const updatedFloatingLeg: Leg = {
-    ...irs.floatingLeg,      // Copy existing Leg properties
-    rate: updatedFloatingRate, // Use the updated rate
-  };
-
-  // Create new IRS with updated leg
   return {
-    ...irs,                  // Copy existing IRS properties
-    floatingLeg: updatedFloatingLeg, // Use the updated leg
+    ...irs,
+    floatingLeg: {
+      ...irs.floatingLeg,
+      rate: {
+        ...irs.floatingLeg.rate,
+        spread: newSpread,
+      },
+    },
   };
 }
 ```
 
-This manual approach, while correct, suffers from several significant drawbacks:
+This is not terrible. In fact, for one update it is probably fine. The problem starts when this pattern appears fifty times, each copy slightly different, each one depending on the developer remembering the exact shape of the object.
 
-1.  **Verbosity:** The boilerplate for cloning at each level obscures the simple intent of updating one field.
-2.  **Fragility:** Highly susceptible to errors. If the structure of `IRS` or `Leg` changes (e.g., a new field is added), this update logic must be manually revisited and corrected everywhere it's used.
-3.  **Error Proneness:** Handling discriminated unions (`Rate`) requires careful type checks. Omitting checks or handling them incorrectly can lead to runtime errors or invalid state.
-4.  **Maintainability:** As the complexity of the data structures and the number of update scenarios grow, this approach becomes increasingly difficult to manage and reason about.
+There are several failure modes:
 
-## Introducing Lenses: A Functional Paradigm for Composable Data Access
+- copy the top level but mutate a nested object,
+- forget one level of copying,
+- handle one branch of a discriminated union but not another,
+- duplicate path knowledge across services, forms, validators, and formula engines,
+- make a schema change and miss one of the hand-written update paths.
 
-The Lens pattern provides a powerful abstraction to conquer these challenges. A Lens can be thought of as a *first-class* functional reference – a value that encapsulates the logic for focusing on a specific part (`A`) within a larger data structure (`S`). It bundles two core operations:
+"Be careful" is not an architecture. If a path through a domain object matters, it deserves a name.
 
-1.  **`view`**: \( S \rightarrow A \) (Extracts the focused part `A` from the whole `S`)
-2.  **`set`**: \( S \rightarrow A \rightarrow S \) (Takes the whole `S` and a new part `A'`, returns a *new* whole `S'` with the part updated)
+## A Lens Is a Named Focus
 
-The effectiveness of Lenses stems from several key properties:
-
-*   **Composability:** Lenses compose naturally. A Lens focusing from `S` to `B` and another from `B` to `A` can be combined to yield a Lens directly from `S` to `A`, elegantly handling nested structures.
-*   **Immutability:** The `set` operation is inherently immutable, always returning a new instance of the source structure, aligning perfectly with functional programming principles.
-*   **Abstraction:** Lenses hide the intricate navigation and cloning logic, exposing a clean, focused interface for getting and setting values.
-
-## Implementing Lenses in TypeScript
-
-Let's define a generic `Lens` interface in TypeScript, capturing its essence:
+A lens is a pair of functions that knows how to look at part of a structure and how to replace that part immutably.
 
 ```typescript
 interface Lens<S, A> {
@@ -115,224 +92,269 @@ interface Lens<S, A> {
   readonly set: (source: S, newValue: A) => S;
 }
 ```
-*(Annotation: `S` represents the 'Source' or 'Whole' structure, and `A` represents the 'Target' or 'Part' being focused upon.)*
 
-We can create helper functions to construct basic Lenses. A common one focuses on a specific object property:
+`S` is the source, the larger structure. `A` is the part being focused.
+
+For example, a lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Compose them, and you get a lens from `IRS` directly to the floating leg's rate.
+
+The simplest useful lens targets a property:
 
 ```typescript
-// --- Basic Lens Construction ---
-
-/**
- * Creates a Lens focusing on a specific property of an object.
- * Assumes the source object S is treated immutably.
- */
 function lensProp<S, K extends keyof S>(prop: K): Lens<S, S[K]> {
   return {
-    view: (source: S): S[K] => source[prop],
-    // Uses spread syntax for shallow, immutable update at this level
-    set: (source: S, newValue: S[K]): S => ({ ...source, [prop]: newValue }),
+    view: (source) => source[prop],
+    set: (source, newValue) => ({ ...source, [prop]: newValue }),
   };
 }
 
-// --- Example Basic Lenses ---
-const irsFloatingLegLens: Lens<IRS, Leg> = lensProp('floatingLeg');
-const legRateLens: Lens<Leg, Rate> = lensProp('rate');
-const optionStrikeLens: Lens<EuropeanCallOption, number> = lensProp('strike');
+const floatingLegLens = lensProp<IRS, "floatingLeg">("floatingLeg");
+const rateLens = lensProp<Leg, "rate">("rate");
 ```
 
-While `lensProp` is useful, the true power lies in composition. We define a `composeLens` function:
+This is small enough to look underwhelming. That is usually a good sign. The useful part is composition:
 
 ```typescript
-// --- Lens Composition ---
-
-function composeLens<S, B, A>(outer: Lens<S, B>, inner: Lens<B, A>): Lens<S, A> {
+function composeLens<S, B, A>(
+  outer: Lens<S, B>,
+  inner: Lens<B, A>
+): Lens<S, A> {
   return {
-    // View composition: view outer, then view inner on the result
-    view: (source: S): A => inner.view(outer.view(source)),
-    // Set composition: view outer, set inner on the result, then set outer with the modified inner part
-    set: (source: S, newValue: A): S =>
+    view: (source) => inner.view(outer.view(source)),
+    set: (source, newValue) =>
       outer.set(source, inner.set(outer.view(source), newValue)),
   };
 }
 
-// Example: Lens focusing directly on the Rate of the IRS floating leg
-const irsFloatingLegRateLens: Lens<IRS, Rate> = composeLens(irsFloatingLegLens, legRateLens);
-
-// Now, accessing or updating the rate is straightforward:
-// const floatingRate: Rate = irsFloatingLegRateLens.view(someIRS);
-// const updatedIRS: IRS = irsFloatingLegRateLens.set(someIRS, newRateValue);
+const floatingRateLens = composeLens(floatingLegLens, rateLens);
 ```
-*(Annotation: The `set` composition might seem complex, but it precisely implements the immutable update logic: get the intermediate part (`B`), update it using the inner lens (`inner.set`), and then update the original structure (`S`) with this modified intermediate part using the outer lens (`outer.set`).)*
 
-This compositional approach dramatically simplifies interaction with nested immutable data, making the code more readable, less error-prone, and adaptable to structural changes.
-
-## The Lens Laws: Ensuring Consistency and Predictability
-
-For an implementation to be considered a *lawful* Lens, it must adhere to three fundamental properties. These laws are not mere academic curiosities; they guarantee that Lenses behave predictably and consistently, which is essential for building reliable systems and reasoning about composed operations.
-
-1.  **Identity (View-Set or Get-Put):** Viewing a value and then setting it back should result in the original structure. This ensures `set` doesn't have unexpected side effects when the value hasn't actually changed.
-    \[ \text{set}(s, \text{view}(s)) = s \]
-
-    ```typescript
-    // Law 1 Demonstration: Using optionStrikeLens
-    const option: EuropeanCallOption = { id: 'opt1', underlying: 'XYZ', strike: 100, expiry: Date.now(), style: 'European' };
-    // expect(optionStrikeLens.set(option, optionStrikeLens.view(option))).toEqual(option); // Should pass
-    ```
-
-2.  **Retention (Set-View or Put-Get):** Setting a value `a` into a structure `s` means that viewing the result must yield `a`. This ensures the `set` operation actually worked as intended.
-    \[ \text{view}(\text{set}(s, a)) = a \]
-
-    ```typescript
-    // Law 2 Demonstration: Using optionStrikeLens
-    const option: EuropeanCallOption = { id: 'opt1', underlying: 'XYZ', strike: 100, expiry: Date.now(), style: 'European' };
-    const newStrike = 105;
-    // expect(optionStrikeLens.view(optionStrikeLens.set(option, newStrike))).toEqual(newStrike); // Should pass
-    ```
-
-3.  **Associativity (Set-Set or Put-Put):** Setting a value `a` and then immediately setting another value `b` is equivalent to just setting `b` directly. The last `set` operation takes precedence.
-    \[ \text{set}(\text{set}(s, a), b) = \text{set}(s, b) \]
-
-    ```typescript
-    // Law 3 Demonstration: Using optionStrikeLens
-    const option: EuropeanCallOption = { id: 'opt1', underlying: 'XYZ', strike: 100, expiry: Date.now(), style: 'European' };
-    const strikeA = 105;
-    const strikeB = 110;
-    // expect(optionStrikeLens.set(optionStrikeLens.set(option, strikeA), strikeB))
-    //     .toEqual(optionStrikeLens.set(option, strikeB)); // Should pass
-    ```
-
-Adherence to these laws ensures that Lenses compose predictably and form a reliable abstraction for data manipulation. Testing Lens implementations against these laws is a valuable practice.
-
-## The Path Forward: Configuration-Driven Data Access
-
-While defining Lenses directly in code, as shown above, offers significant benefits, many enterprise systems require even greater flexibility. It's often advantageous to define data access patterns *declaratively*, driven by external configuration rather than hardcoded logic. This allows data mappings to evolve independently of the core application code and potentially be managed through administrative interfaces or metadata repositories.
-
-We can conceptualize this using a `LensConfig` – metadata describing how to construct a Lens. This configuration could originate from a database table, a JSON file, or even be generated via introspection.
+The `set` implementation is the whole trick. It views the intermediate value, updates it through the inner lens, then writes the updated intermediate value back through the outer lens. The caller does not need to remember how many levels of object spread are required.
 
 ```typescript
-// --- Configuration-Driven Lenses ---
+const currentRate = floatingRateLens.view(irs);
+const updatedIrs = floatingRateLens.set(irs, {
+  type: "Floating",
+  index: "SOFR",
+  spread: 0.004,
+});
+```
 
+The path now has a name. That is the practical benefit. Once a path has a name, it can be reused, tested, composed, and discussed in code review without re-reading object spread syntax.
+
+## The Laws Are the Contract
+
+Lenses come with three laws. You do not need category theory to understand them. They are just sanity checks.
+
+First, if you view a value and set it back, nothing should change.
+
+```typescript
+lens.set(source, lens.view(source)) === source;
+```
+
+Second, if you set a value and immediately view it, you should get the value you set.
+
+```typescript
+lens.view(lens.set(source, value)) === value;
+```
+
+Third, if you set a value and then set another value, the last set wins.
+
+```typescript
+lens.set(lens.set(source, a), b) === lens.set(source, b);
+```
+
+These sound obvious, which is exactly why they are valuable. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. In production code, test your reusable lenses against these laws. Property-based testing is particularly effective here because the laws are expressed over all valid inputs, not just one hand-picked example.
+
+The companion code uses `fast-check` for this. The important idea is simple: when an abstraction exists to protect an invariant, test the invariant directly.
+
+## The Part People Get Wrong
+
+The first temptation after discovering lenses is to make everything configurable.
+
+That instinct is understandable. Enterprise systems often have formula engines, configurable forms, import mappings, reporting tokens, and client-specific data models. You do not want to hard-code every path in application logic. You want a token like `IRS.Notional` or `Option.Strike` to resolve to the right value in the current data structure.
+
+A minimal configuration might look like this:
+
+```typescript
 interface LensConfig {
-  readonly sourceType: string; // Identifier for the source structure type (for validation/context)
-  readonly targetType: string; // Identifier for the target value type (for validation/coercion)
-  readonly getterPath: ReadonlyArray<string | number>; // Path elements (property names or array indices)
-  // Additional metadata could include validation rules, coercion logic identifiers, etc.
+  readonly sourceType: string;
+  readonly targetType: string;
+  readonly getterPath: ReadonlyArray<string | number>;
 }
 
-// Using Immer for efficient immutable updates based on paths
-import produce, { enableMapSet } from 'immer';
-enableMapSet(); // Enable Immer support for Map/Set if needed
+const optionStrikeConfig: LensConfig = {
+  sourceType: "EuropeanCallOption",
+  targetType: "number",
+  getterPath: ["strike"],
+};
+```
 
-function createLensFromConfig<S extends object, A>(config: LensConfig): Lens<S, A> {
-  // Basic validation (robust validation is crucial in production)
-  if (!config.getterPath || config.getterPath.length === 0) {
-    throw new Error("LensConfig requires a non-empty getterPath");
-  }
+From there, it is easy to write a path-based lens generator:
 
-  const view = (source: S): A | undefined => { // Return type includes undefined for safety
-    let current: any = source;
-    for (const pathElement of config.getterPath) {
-      // Check for null or undefined at each step
-      if (current === null || current === undefined) {
-        // Strategy: Return undefined. Could also throw or return an Either/Option.
-        return undefined;
+```typescript
+function createLensFromConfig<S extends object, A>(
+  config: LensConfig
+): Lens<S, A> {
+  return {
+    view: (source) => {
+      let current: any = source;
+      for (const key of config.getterPath) {
+        current = current[key];
       }
-      // Basic indexing works for object properties and array indices
-      current = current[pathElement];
-    }
-    // Optional: Add type coercion/validation based on config.targetType here
-    return current as A; // Cast needed due to 'any'; relies on config correctness
+      return current as A;
+    },
+    set: (source, newValue) => {
+      // Usually implemented with Immer or a similar structural sharing helper.
+      // The full companion code includes a safer implementation with path checks.
+      throw new Error("set implementation omitted for brevity");
+    },
   };
-
-  const set = (source: S, newValue: A): S => {
-    // Use Immer to handle the immutable update based on the path
-    return produce(source, (draft) => {
-      let current: any = draft;
-      const lastIndex = config.getterPath.length - 1;
-
-      // Traverse to the second-to-last element
-      for (let i = 0; i < lastIndex; i++) {
-        const pathElement = config.getterPath[i];
-        if (current[pathElement] === null || current[pathElement] === undefined) {
-           // Critical Decision: What to do if path doesn't exist during set?
-           // Option 1: Throw an error (safest if path must exist).
-           // Option 2: Attempt to create intermediate structure (requires type info).
-           // Option 3: Silently fail (potentially dangerous).
-           throw new Error(`Invalid path element '${String(pathElement)}' at index ${i} during set`);
-        }
-        current = current[pathElement];
-      }
-      // Set the value on the final element
-      current[config.getterPath[lastIndex]] = newValue;
-    });
-  };
-
-  // Note: This basic 'view' returns 'A | undefined'. The Lens interface expects 'A'.
-  // A more robust solution might involve returning Option<A> or Either<Error, A>
-  // or making guarantees about the config ensuring the path always exists.
-  // For simplicity here, we assume the path exists or handle undefined downstream.
-  return { view: view as (source: S) => A, set }; // Cast needed due to view's undefined return
 }
 ```
-*(Annotation: This `createLensFromConfig` utilizes Immer for efficient path-based updates. However, it highlights crucial challenges: robust error handling for invalid paths (especially during `set`), lack of inherent type safety without further validation based on `sourceType`/`targetType`, and the difficulty of safely handling complex types like discriminated unions solely via simple paths. A production system would require more sophisticated validation and potentially richer configuration.)*
 
-This configuration-driven approach offers significant advantages in evolving systems:
+This is also where the abstraction becomes dangerous.
 
-*   **Decoupling:** Application logic uses Lenses without hardcoding specific data paths.
-*   **Maintainability:** Changes to data structures primarily impact configuration, not widespread code.
-*   **Flexibility:** Data mappings can be updated dynamically or managed externally.
+A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is valid for `IRS`, or that the value at the end is a number, or that the rate is actually the `Floating` variant when you get there. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
 
-## Application Spotlight: A Token-Driven Financial Formula System
+That does not make configuration-driven access wrong. It means the boundary has to be treated as an untrusted input boundary.
 
-The power of configurable Lenses becomes particularly apparent when applied to systems involving dynamic calculations, such as financial formula engines. In such systems, formulas for calculating metrics (e.g., Present Value, Greeks, cash flows) can be defined using symbolic *tokens* that represent specific data points within the financial models.
+A production version needs to answer several questions explicitly:
 
-1.  **Tokens as Logical Pointers:** A token (e.g., `"IRS.Notional"`, `"Option.Volatility"`, `"FloatingLeg.DayCount"`) acts as a stable identifier for a piece of data.
-2.  **Configuration as the Bridge:** A configuration layer (database, files) maps each token to its corresponding `LensConfig`, detailing how to locate that data within the actual object structure.
-3.  **Formula Evaluation:**
-    *   The engine parses a formula expression (e.g., `PV = ComputePV(FixedLegCashFlows, DiscountCurve)`).
-    *   It identifies the input tokens required (`FixedLegCashFlows`, `DiscountCurve`).
-    *   For each token, it retrieves the associated `LensConfig`.
-    *   It uses `createLensFromConfig` (potentially with caching) to generate the necessary `Lens` instances.
-    *   It applies the `view` function of each Lens to the input financial data object (e.g., an `IRS` instance, market data context) to fetch the required values.
-    *   It executes the core calculation logic (e.g., the `ComputePV` function).
-    *   If the formula's purpose is to calculate a value to be stored back (e.g., a calculated premium), it uses the `set` function of the appropriate Lens.
+- What happens when a path is missing?
+- Does `view` return `undefined`, throw, or return a typed result?
+- Can `set` create intermediate objects, or must the full path already exist?
+- How are discriminated unions handled?
+- Who validates that `targetType` matches the actual runtime value?
+- Are generated lenses cached, or rebuilt on every call?
 
-This architecture yields a highly flexible and maintainable calculation system:
+The companion implementation returns a structured view result instead of pretending every path lookup succeeds:
 
-*   **Declarative Formulas:** Formulas focus on the financial logic, independent of data structure details.
-*   **Resilience to Change:** Data model refactoring only requires updating the token-to-`LensConfig` mapping.
-*   **Extensibility:** Adding new calculations or data inputs involves defining new tokens, configurations, and the core calculation logic.
+```typescript
+type ViewResult<A> =
+  | { readonly success: true; readonly value: A }
+  | { readonly success: false; readonly error: string };
+```
 
-## Advanced Techniques and Considerations
+That is less elegant than the pure lens definition, but more honest for runtime configuration. In code, honesty usually beats elegance.
 
-While the core Lens pattern is powerful, the broader field of functional optics offers related abstractions for handling more nuanced situations:
+## Where This Becomes Useful
 
-*   **Prisms:** Ideal for focusing on parts that might *not* exist, such as a specific variant of a sum type (discriminated union like our `Rate`) or an optional value. They provide a `getOption` method that safely attempts the focus. Composing Lenses with Prisms allows safe access into optional or variant structures (e.g., accessing the `spread` only if the `Rate` *is* a `FloatingRate`).
-*   **Traversals:** Generalize Lenses and Prisms to operate on *multiple* targets simultaneously within a structure (e.g., applying a function to the `rate` of *both* legs of an `IRS`, or updating all elements in an array matching a criterion).
+A good use case is a token-driven formula system.
 
-Exploring libraries like `monocle-ts` provides robust, lawful implementations of these optics and powerful combinators for building sophisticated data accessors.
+Imagine a valuation engine where formulas refer to domain concepts rather than object paths:
 
-Furthermore, consider these practical aspects:
+```text
+PresentValue = DiscountFactor * IRS.Notional
+```
 
-*   **Error Handling Strategy:** Choose explicitly how `view` and `set` (especially in `createLensFromConfig`) handle failures: return `undefined`, throw errors, or return functional types like `Option<A>` or `Either<Error, A>` for composable, type-safe error management.
-*   **Performance:** While generally efficient, especially with Immer's structural sharing, profile critical paths. Cache generated Lenses from configuration to avoid redundant creation.
-*   **Testing:** Test Lens implementations against the Lens Laws. Use property-based testing to ensure they behave correctly across various inputs. Test the `LensConfig` creation and validation logic thoroughly.
+The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. The formula wants the concept. The mapping layer knows where the concept lives.
 
-## Conclusion: Towards Principled Data Interaction
+A simplified flow looks like this:
 
-The Lens pattern offers a robust, composable, and principled approach to interacting with complex, immutable data structures – a common challenge in domains like financial modeling. By abstracting the mechanics of viewing and updating nested data, Lenses enhance code clarity, reduce fragility, and improve maintainability. Integrating them with configuration-driven generation unlocks significant flexibility, enabling systems like token-based formula engines that are resilient to data model evolution.
+```typescript
+type FormulaResult = number | string | boolean | object | null;
 
-While this article has explored the fundamentals and implementation patterns in TypeScript, it's worth mentioning that Lenses are a specific application of deeper category theory concepts. Recognizing this connection, even superficially, can open doors to understanding other powerful functional programming abstractions.
+interface FormulaDefinition {
+  readonly getRequiredTokens: () => string[];
+  readonly execute: (inputs: Record<string, unknown>) => FormulaResult;
+}
 
-For developers building complex systems, especially those valuing immutability and clear separation of concerns, investing time in understanding and applying Lenses (and potentially their cousins, Prisms and Traversals) can yield substantial benefits in code quality and long-term system health. Whether through custom implementations or by leveraging mature libraries, embracing the principles behind Lenses leads towards more declarative, predictable, and maintainable software.
+interface RuntimeLens<S, A> {
+  readonly view: (source: S) => ViewResult<A>;
+  readonly set: (source: S, newValue: A) => S;
+}
 
-## References and Further Reading
+function evaluateFormula(
+  formulaId: string,
+  dataContext: object
+): FormulaResult {
+  const formula: FormulaDefinition = lookupFormulaDefinition(formulaId);
+  const inputs: Record<string, unknown> = {};
 
-*   [Monocle-TS Documentation](https://gcanti.github.io/monocle-ts/) (Primary optics library for TypeScript)
-*   [Ramda Documentation (Lenses)](https://ramdajs.com/docs/#lens) (Functional utility library with Lens support, including `lensPath`)
-*   [fp-ts Documentation](https://gcanti.github.io/fp-ts/) (Foundation for functional programming in TypeScript, including `Either` and `Option`)
-*   [Immer Documentation](https://immerjs.github.io/immer/) (Simplifies immutable updates)
-*   [Professor Frisby's Mostly Adequate Guide to Functional Programming](https://mostly-adequate.gitbook.io/mostly-adequate-guide/) (Accessible introduction to FP concepts, including Lenses)
-*   [A Toste of Practical Optics](https://medium.com/@gcanti/a-taste-of-practical-optics-a770d135d589) (Insightful article by Giulio Canti)
-* https://medium.com/@gcanti/introduction-to-optics-lenses-and-prisms-3230e73bfcfe
-*   [Domain-Specific Languages](https://martinfowler.com/books/dsl.html) by Martin Fowler (Context for formula/query systems)
+  for (const token of formula.getRequiredTokens()) {
+    const config = lookupLensConfig(token);
+    if (!config) {
+      throw new Error(`Missing lens configuration for token: ${token}`);
+    }
+
+    const lens: RuntimeLens<object, unknown> = createRuntimeLens(config);
+    const result = lens.view(dataContext);
+
+    if (!result.success) {
+      throw new Error(`Could not resolve ${token}: ${result.error}`);
+    }
+
+    inputs[token] = result.value;
+  }
+
+  return formula.execute(inputs);
+}
+```
+
+This gives you a clean separation:
+
+- formulas express business logic,
+- lens configuration maps business tokens to data locations,
+- lenses perform the access,
+- validation decides what happens when the mapping is wrong.
+
+Senior engineers will recognize the trade-off immediately. This is a powerful boundary because it decouples formula logic from object shape. It is also a risky boundary because bad configuration can corrupt results. The answer is not to avoid the pattern. The answer is to validate aggressively, test mappings, and make failures explicit.
+
+In systems that handle money, silent `undefined` is not a value. It is a bug report with poor timing.
+
+## Lenses Are Not the Whole Optics Story
+
+Lenses focus on a part that exists. Real data is often less cooperative.
+
+A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. This is what **prisms** are for: they focus on one possible variant of a larger type.
+
+Arrays and collections need a different abstraction. If you want to update every leg, every cashflow, or every matching row, you are in **traversal** territory.
+
+You do not need to implement all of these yourself. If you want production-grade optics in TypeScript, look at [`monocle-ts`](https://gcanti.github.io/monocle-ts/). If you only need path-based access and can tolerate weaker type guarantees, Ramda's [`lensPath`](https://ramdajs.com/docs/#lensPath) may be enough.
+
+The decision should be boring:
+
+- use object spread for shallow one-off updates,
+- use named lenses for repeated nested immutable access,
+- use prisms when the target may not exist because of the shape of the type,
+- use traversals when there may be many targets,
+- use a library when the abstraction becomes central to the system.
+
+Do not introduce optics because they are elegant. Introduce them when they remove duplicated path logic and make correctness easier to check.
+
+## Practical Guidance
+
+If you are adopting this pattern in a TypeScript codebase, start small.
+
+Pick one domain object with repeated nested updates. Replace the duplicated object-spread logic with a small set of named lenses. Add tests for the lens laws. Stop there. If the code gets clearer, continue. If it gets more abstract without removing real duplication, revert it.
+
+For configuration-driven access, treat configuration like code:
+
+- version it,
+- validate it at startup,
+- test it against representative fixtures,
+- cache parsed/generated lenses,
+- surface failures with enough context to debug the bad token or path,
+- avoid pretending runtime paths have compile-time guarantees.
+
+This last point matters. A senior reviewer will not object to lenses because the pattern is unfamiliar. They will object if the pattern hides failure. Make the failure mode visible and the abstraction becomes much easier to defend.
+
+## Conclusion
+
+Lenses are a small idea with a practical payoff: give important paths through immutable data a name.
+
+That name lets you compose access, test update behavior, and remove hand-written cloning code from business logic. In simple cases, object spread is still the right tool. In complex systems with nested domain models, repeated updates, and configurable mappings, lenses provide a useful middle ground between ad-hoc property access and a full persistence/query layer.
+
+The pattern is not free. Runtime configuration weakens type guarantees. Optional fields and unions require more than basic lenses. Teams need to understand the laws well enough to test them. But these costs are bounded, and they are usually smaller than the cost of debugging silent mutation or duplicated path logic across a large codebase.
+
+Monday morning: find one nested immutable update that appears in more than one place. Give the path a name. Write the three lens-law tests. If the code becomes easier to read, you have your first useful lens.
+
+## References
+
+- [Companion code: data-access-with-lenses](https://github.com/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses)
+- [Monocle-TS Documentation](https://gcanti.github.io/monocle-ts/)
+- [Ramda lensPath](https://ramdajs.com/docs/#lensPath)
+- [Immer Documentation](https://immerjs.github.io/immer/)
+- [Professor Frisby's Mostly Adequate Guide to Functional Programming](https://mostly-adequate.gitbook.io/mostly-adequate-guide/)
+- [A Taste of Practical Optics](https://medium.com/@gcanti/a-taste-of-practical-optics-a770d135d589)
+- [Domain-Specific Languages](https://martinfowler.com/books/dsl.html) by Martin Fowler
