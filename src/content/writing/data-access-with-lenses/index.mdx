@@ -229,22 +229,22 @@ A production version needs to answer several questions explicitly:
 - Who validates that `targetType` matches the actual runtime value?
 - Are generated lenses cached, or rebuilt on every call?
 
-The companion implementation returns a [`Result`](/writing/type-safe-error-handling)-shaped value instead of pretending every path lookup succeeds:
+The runtime version of `view` returns a [`Result`](/writing/type-safe-error-handling) instead of pretending every path lookup succeeds:
 
 ```typescript
-type ViewResult<A> =
-  | { readonly success: true; readonly value: A }
-  | { readonly success: false; readonly error: string };
+type Result<T, E> =
+  | { readonly success: true; readonly value: T }
+  | { readonly success: false; readonly error: E };
 
 interface Lens<S, A> {
-  readonly view: (source: S) => ViewResult<A>;
+  readonly view: (source: S) => Result<A, string>;
   readonly set: (source: S, newValue: A) => S;
 }
 ```
 
-`ViewResult<A>` is structurally `Result<A, string>`; a production version would carry a richer error type with the token, the configured path, the offending segment, and the source type. The pure lens definition is shorter; the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
+The pure lens definition is shorter. The runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path. A `string` error keeps the lens itself focused on a single concern; the formula engine in the next section carries a typed error union, and a production version would add the configured path, the offending segment, and the source type for richer logs.
 
-Once `view` returns a `ViewResult`, a configuration-driven formula engine becomes a reasonable thing to build on top.
+Once `view` returns a `Result`, a configuration-driven formula engine becomes a reasonable thing to build on top.
 
 ## A Token-Driven Formula Engine
 
@@ -266,34 +266,41 @@ interface FormulaDefinition {
   readonly execute: (inputs: Record<string, unknown>) => FormulaResult;
 }
 
+type FormulaError =
+  | { readonly kind: "MissingLensConfig"; readonly token: string }
+  | { readonly kind: "ResolutionFailed"; readonly token: string; readonly reason: string };
+
 function evaluateFormula(
   formulaId: string,
   dataContext: object
-): FormulaResult {
+): Result<FormulaResult, FormulaError> {
   const formula = lookupFormulaDefinition(formulaId);
   const inputs: Record<string, unknown> = {};
 
   for (const token of formula.getRequiredTokens()) {
     const config = lookupLensConfig(token);
     if (!config) {
-      throw new Error(`Missing lens configuration for token: ${token}`);
+      return { success: false, error: { kind: "MissingLensConfig", token } };
     }
 
-    const lens = createLensFromConfig(config);
-    const result = lens.view(dataContext);
-
+    const result = createLensFromConfig(config).view(dataContext);
     if (!result.success) {
-      throw new Error(`Could not resolve ${token}: ${result.error}`);
+      return {
+        success: false,
+        error: { kind: "ResolutionFailed", token, reason: result.error },
+      };
     }
 
     inputs[token] = result.value;
   }
 
-  return formula.execute(inputs);
+  return { success: true, value: formula.execute(inputs) };
 }
 ```
 
-Formulas hold the business logic, lens configuration locates the data, and validation catches bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and explicit failures.
+The function never throws. `FormulaError` distinguishes a missing configuration from a path that fails to resolve, and each variant carries the token. Callers handle both the success and failure arms, and TypeScript flags any missed case.
+
+Formulas hold the business logic, lens configuration locates the data, and validation catches bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and a typed error channel rather than thrown exceptions.
 
 That separation also opens a question the typed version never had to answer: who owns the tokens, and what happens when their underlying paths change?
 
