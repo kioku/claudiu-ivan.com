@@ -1,5 +1,6 @@
 import { produce } from "immer";
-import { type Lens, type ViewResult } from "./lens-core";
+import { type Result, ok, err, isErr } from "result-option-types";
+import { type Lens, type ViewResult, type SetResult } from "./lens-core";
 
 export interface LensConfig {
   readonly sourceType: string;
@@ -7,46 +8,35 @@ export interface LensConfig {
   readonly getterPath: ReadonlyArray<string | number>;
 }
 
-type ValidationError = {
-  success: false;
-  error: string;
-};
-
-type ValidationSuccess<T> = {
-  success: true;
-  value: T;
-};
-
-const createError = (message: string): ValidationError => ({
-  success: false,
-  error: message,
-});
-
-const createPathError = (
+const pathError = (
   message: string,
   path: ReadonlyArray<string | number>
-): ValidationError => createError(`${message}. Path: ${path.join(".")}`);
+): string => `${message}. Path: ${path.join(".")}`;
 
-const validatePathElement = <T>(
+function validatePathElement<T>(
   current: unknown,
   pathElement: string | number,
   path: ReadonlyArray<string | number>
-): ValidationError | ValidationSuccess<T> => {
+): Result<T, string> {
   if (current === null || current === undefined) {
-    return createPathError(
-      `Path failed. Element '${String(
-        pathElement
-      )}' not found as current object is null/undefined`,
-      path
+    return err(
+      pathError(
+        `Path failed. Element '${String(
+          pathElement
+        )}' not found as current object is null/undefined`,
+        path
+      )
     );
   }
 
   if (typeof current !== "object" && typeof current !== "function") {
-    return createPathError(
-      `Path failed. Cannot access property '${String(
-        pathElement
-      )}' on non-object type (${typeof current})`,
-      path
+    return err(
+      pathError(
+        `Path failed. Cannot access property '${String(
+          pathElement
+        )}' on non-object type (${typeof current})`,
+        path
+      )
     );
   }
 
@@ -57,91 +47,98 @@ const validatePathElement = <T>(
 
   if (!(pathElement in current) && !isValidArrayAccess) {
     if (Array.isArray(current) && typeof pathElement === "number") {
-      return createPathError(
-        `Path failed. Index ${pathElement} out of bounds for array (length ${current.length})`,
-        path
+      return err(
+        pathError(
+          `Path failed. Index ${pathElement} out of bounds for array (length ${current.length})`,
+          path
+        )
       );
     }
-    return createPathError(
-      `Path failed. Property '${String(
-        pathElement
-      )}' does not exist on current object`,
-      path
+    return err(
+      pathError(
+        `Path failed. Property '${String(
+          pathElement
+        )}' does not exist on current object`,
+        path
+      )
     );
   }
 
-  return {
-    success: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    value: (current as any)[pathElement] as T,
-  };
-};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ok((current as any)[pathElement] as T);
+}
 
 /**
- * Creates a Lens from configuration metadata.
+ * Creates a Lens from configuration metadata. The factory itself returns
+ * a Result because the configuration can be invalid (e.g. empty
+ * getterPath); the returned lens follows the same convention: view fails
+ * by Err when the path does not resolve, and set fails by Err when an
+ * intermediate object is missing.
+ *
  * Caveats: Relies on 'any' internally. Correctness of 'A' depends on LensConfig.
  * Does not inherently handle discriminated unions safely within path traversal without more complex config.
  */
 export function createLensFromConfig<S extends object, A>(
   config: LensConfig
-): Lens<S, A> {
+): Result<Lens<S, A>, string> {
   if (!config.getterPath || config.getterPath.length === 0) {
-    throw new Error("LensConfig requires a non-empty getterPath");
+    return err("LensConfig requires a non-empty getterPath");
   }
 
   const view = (source: S): ViewResult<A> => {
     let current: unknown = source;
 
     for (const pathElement of config.getterPath) {
-      const validationResult = validatePathElement(
+      const validationResult = validatePathElement<unknown>(
         current,
         pathElement,
         config.getterPath
       );
-      if (!validationResult.success) {
+      if (isErr(validationResult)) {
         return validationResult;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      current = validationResult.value as A;
-      // current = (current as any)[pathElement];
+      current = validationResult.value;
     }
 
-    return { success: true, value: current as A };
+    return ok(current as A);
   };
 
-  const set = (source: S, newValue: A): S => {
-    return produce(source, (draft) => {
-      const traversePath = (
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        obj: any,
-        path: ReadonlyArray<string | number>,
-        value: A
-      ): void => {
-        const [head, ...tail] = path;
+  const set = (source: S, newValue: A): SetResult<S> => {
+    // Pre-validate intermediates so set fails by Err rather than throw
+    // when a parent is missing or not an object.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let cursor: any = source;
+    for (let i = 0; i < config.getterPath.length - 1; i++) {
+      const head = config.getterPath[i];
+      if (head === undefined) {
+        break;
+      }
+      if (cursor[head] === null || typeof cursor[head] !== "object") {
+        return err(
+          `Invalid path element '${String(
+            head
+          )}' during set: parent is not an object or property does not exist.`
+        );
+      }
+      cursor = cursor[head];
+    }
 
-        if (head === undefined) {
-          return;
+    const updated = produce(source, (draft) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let current: any = draft;
+      for (let i = 0; i < config.getterPath.length - 1; i++) {
+        const head = config.getterPath[i];
+        if (head !== undefined) {
+          current = current[head];
         }
-
-        if (tail.length === 0) {
-          obj[head] = value;
-          return;
-        }
-
-        if (obj[head] === null || typeof obj[head] !== "object") {
-          throw new Error(
-            `Invalid path element '${String(
-              head
-            )}' during set: parent is not an object or property does not exist.`
-          );
-        }
-
-        traversePath(obj[head], tail, value);
-      };
-
-      traversePath(draft, config.getterPath, newValue);
+      }
+      const last = config.getterPath[config.getterPath.length - 1];
+      if (last !== undefined) {
+        current[last] = newValue;
+      }
     });
+    return ok(updated);
   };
 
-  return { view, set };
+  return ok({ view, set });
 }
