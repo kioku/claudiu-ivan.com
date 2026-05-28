@@ -7,15 +7,17 @@ draft: false
 
 There is a kind of code review comment I have written too many times: "this update mutates the original object." It usually appears in a harmless-looking change. Someone needs to update a field three levels down in a data structure, spreads the top-level object, changes the nested value, and misses one of the intermediate copies.
 
-The bug is not that the developer failed to be careful enough. The bug is that the code asked a human to manually preserve an invariant the type system could have helped with.
+The developer may have been careful and still missed the invariant. The code asked a person to preserve something the type system could have helped with.
 
 In financial systems this shows up constantly. Instruments like swaps, options, policies, portfolios, and valuation contexts are naturally nested. The same is true outside finance: claims processing, logistics, document workflows, entitlement models, product catalogs. Once the domain gets real, the objects stop being flat.
 
-Immutability helps because it makes state changes predictable. It is easier to audit, easier to test, and safer under concurrency. But immutability has a practical cost: updating deeply nested data can become noisy enough that the intent disappears.
+Immutability helps because it makes state changes predictable. It is easier to audit, easier to test, and safer under concurrency. But immutability has a practical cost: updating nested data can become noisy enough that the intent disappears.
 
-This article looks at **lenses**, a small functional programming idea that gives us a reusable way to focus on part of a larger structure. The point is not to make TypeScript look like Haskell. The point is to stop rewriting the same fragile object-copying code by hand.
+Path ownership is the larger design problem. When a field path is used by forms, imports, reports, and formulas, it stops being an implementation detail. It becomes a contract between the domain model and the rest of the system. Repeating that contract as raw property access makes schema changes harder to review and harder to test.
 
-The complete companion code, including tests, is available in the [data-access-with-lenses playground](https://github.com/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses). The snippets below start with the minimal form because it is easier to understand; the companion code makes failure more explicit once runtime configuration enters the picture.
+**Lenses** are a functional programming idea for focusing on part of a larger structure. In TypeScript, they give shared paths a name and move fragile object-copying code behind a testable interface.
+
+Code for the examples, including tests, is available in the [data-access-with-lenses playground](https://github.com/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses). The article starts with the minimal form; the companion code makes failure more explicit once runtime configuration enters the picture.
 
 ## The Problem
 
@@ -49,7 +51,7 @@ interface FloatingRate {
 }
 ```
 
-If we want to update the spread on the floating leg without mutating the original object, the direct implementation looks like this:
+If we want to update the spread on the floating leg without mutating the original object, the direct implementation is:
 
 ```typescript
 function updateSpreadManually(irs: IRS, newSpread: number): IRS {
@@ -70,9 +72,9 @@ function updateSpreadManually(irs: IRS, newSpread: number): IRS {
 }
 ```
 
-This is not terrible. In fact, for one update it is probably fine. The problem starts when this pattern appears fifty times, each copy slightly different, each one depending on the developer remembering the exact shape of the object.
+For one update, this is probably fine. The problem starts when this pattern appears fifty times, each copy slightly different, each one depending on the developer remembering the exact shape of the object.
 
-There are several failure modes:
+The failures tend to be mundane:
 
 - copy the top level but mutate a nested object,
 - forget one level of copying,
@@ -80,7 +82,7 @@ There are several failure modes:
 - duplicate path knowledge across services, forms, validators, and formula engines,
 - make a schema change and miss one of the hand-written update paths.
 
-"Be careful" is not an architecture. If a path through a domain object matters, it deserves a name.
+A codebase should not rely on "be careful" as its enforcement mechanism. If a path through a domain object matters, it deserves a name.
 
 ## A Lens Is a Named Focus
 
@@ -95,9 +97,9 @@ interface Lens<S, A> {
 
 `S` is the source, the larger structure. `A` is the part being focused.
 
-For example, a lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Compose them, and you get a lens from `IRS` directly to the floating leg's rate.
+A lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Compose them, and you get a lens from `IRS` directly to the floating leg's rate.
 
-The simplest useful lens targets a property:
+The simplest lens targets a property:
 
 ```typescript
 function lensProp<S, K extends keyof S>(prop: K): Lens<S, S[K]> {
@@ -111,7 +113,7 @@ const floatingLegLens = lensProp<IRS, "floatingLeg">("floatingLeg");
 const rateLens = lensProp<Leg, "rate">("rate");
 ```
 
-This is small enough to look underwhelming. That is usually a good sign. The useful part is composition:
+The implementation is deliberately small. Composition gives it range:
 
 ```typescript
 function composeLens<S, B, A>(
@@ -128,7 +130,7 @@ function composeLens<S, B, A>(
 const floatingRateLens = composeLens(floatingLegLens, rateLens);
 ```
 
-The `set` implementation is the whole trick. It views the intermediate value, updates it through the inner lens, then writes the updated intermediate value back through the outer lens. The caller does not need to remember how many levels of object spread are required.
+The composed `set` does three things: view the intermediate value, update it through the inner lens, then write the updated intermediate value back through the outer lens. The caller does not need to remember how many levels of object spread are required.
 
 ```typescript
 const currentRate = floatingRateLens.view(irs);
@@ -139,41 +141,39 @@ const updatedIrs = floatingRateLens.set(irs, {
 });
 ```
 
-The path now has a name. That is the practical benefit. Once a path has a name, it can be reused, tested, composed, and discussed in code review without re-reading object spread syntax.
+Naming the path changes the maintenance model. A named path can be reused, tested, composed, and discussed in code review without re-reading object spread syntax.
 
 ## The Laws Are the Contract
 
 Lenses come with three laws. You do not need category theory to understand them. They are just sanity checks.
 
-First, if you view a value and set it back, nothing should change.
+The view-set law: viewing a value and setting it back should leave the source unchanged.
 
 ```typescript
 lens.set(source, lens.view(source)) === source;
 ```
 
-Second, if you set a value and immediately view it, you should get the value you set.
+The set-view law: setting a value and immediately viewing it should return the value you set.
 
 ```typescript
 lens.view(lens.set(source, value)) === value;
 ```
 
-Third, if you set a value and then set another value, the last set wins.
+The set-set law: setting a value and then setting another value is equivalent to setting the second value directly.
 
 ```typescript
 lens.set(lens.set(source, a), b) === lens.set(source, b);
 ```
 
-These sound obvious, which is exactly why they are valuable. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. In production code, test your reusable lenses against these laws. Property-based testing is particularly effective here because the laws are expressed over all valid inputs, not just one hand-picked example.
+The laws make good tests because they are easy to state and easy to violate. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. In production code, test your reusable lenses against these laws. Property-based testing works well here because the laws are expressed over all valid inputs, not just one hand-picked example.
 
-The companion code uses `fast-check` for this. The important idea is simple: when an abstraction exists to protect an invariant, test the invariant directly.
+The companion code uses `fast-check` for this. When an abstraction exists to protect an invariant, test the invariant directly.
 
-## The Part People Get Wrong
+## Runtime Configuration Is a Boundary
 
-The first temptation after discovering lenses is to make everything configurable.
+Runtime configuration usually appears next. Enterprise systems often have formula engines, configurable forms, import mappings, reporting tokens, and client-specific data models. You do not want to hard-code every path in application logic. You want a token like `IRS.Notional` or `Option.Strike` to resolve to the right value in the current data structure.
 
-That instinct is understandable. Enterprise systems often have formula engines, configurable forms, import mappings, reporting tokens, and client-specific data models. You do not want to hard-code every path in application logic. You want a token like `IRS.Notional` or `Option.Strike` to resolve to the right value in the current data structure.
-
-A minimal configuration might look like this:
+A minimal configuration needs the source type, target type, and path:
 
 ```typescript
 interface LensConfig {
@@ -212,11 +212,9 @@ function createLensFromConfig<S extends object, A>(
 }
 ```
 
-This is also where the abstraction becomes dangerous.
+Generated lenses lose some of the guarantees that made the hand-written version attractive. A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is valid for `IRS`, or that the value at the end is a number, or that the rate is actually the `Floating` variant when you get there. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
 
-A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is valid for `IRS`, or that the value at the end is a number, or that the rate is actually the `Floating` variant when you get there. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
-
-That does not make configuration-driven access wrong. It means the boundary has to be treated as an untrusted input boundary.
+Configuration-driven access can still be the right design, but the boundary has to be treated as an untrusted input boundary.
 
 A production version needs to answer several questions explicitly:
 
@@ -235,21 +233,19 @@ type ViewResult<A> =
   | { readonly success: false; readonly error: string };
 ```
 
-That is less elegant than the pure lens definition, but more honest for runtime configuration. In code, honesty usually beats elegance.
+The pure lens definition is shorter, while runtime configuration needs the error channel. The extra type is the cost of admitting that lookup can fail.
 
-## Where This Becomes Useful
+## Token-Driven Formula Systems
 
-A good use case is a token-driven formula system.
-
-Imagine a valuation engine where formulas refer to domain concepts rather than object paths:
+Valuation engines often refer to domain concepts rather than object paths:
 
 ```text
 PresentValue = DiscountFactor * IRS.Notional
 ```
 
-The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. The formula wants the concept. The mapping layer knows where the concept lives.
+The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. It should refer to the concept while the mapping layer handles the location.
 
-A simplified flow looks like this:
+The engine's core loop is:
 
 ```typescript
 type FormulaResult = number | string | boolean | object | null;
@@ -291,63 +287,70 @@ function evaluateFormula(
 }
 ```
 
-This gives you a clean separation:
+The separation keeps formulas focused on business logic, lens configuration focused on data locations, and validation focused on bad mappings.
 
-- formulas express business logic,
-- lens configuration maps business tokens to data locations,
-- lenses perform the access,
-- validation decides what happens when the mapping is wrong.
+The trade-off: this boundary decouples formula logic from object shape, while bad configuration can still corrupt results. Use the pattern with aggressive validation, mapping tests, and explicit failures.
 
-Senior engineers will recognize the trade-off immediately. This is a powerful boundary because it decouples formula logic from object shape. It is also a risky boundary because bad configuration can corrupt results. The answer is not to avoid the pattern. The answer is to validate aggressively, test mappings, and make failures explicit.
+In systems that handle money, silent `undefined` usually becomes a badly timed bug report.
 
-In systems that handle money, silent `undefined` is not a value. It is a bug report with poor timing.
+## When Paths Become Contracts
 
-## Lenses Are Not the Whole Optics Story
+Typed lenses are a local abstraction. Runtime-configured lenses are a system boundary.
+
+The boundary needs ownership. A token such as `IRS.Notional` may be referenced by formulas, report definitions, client mappings, and support runbooks. A change to the underlying object shape can break all of them without changing a single formula. At that point, lens configuration should be treated like routing rules or database migrations: versioned, reviewed, validated, and observable.
+
+A production setup should make a few things explicit:
+
+- which team owns each token namespace,
+- which domain schema version each path targets,
+- which fixtures prove the mapping still works,
+- whether failures are deploy-time errors or request-time errors,
+- what context appears in an error when lookup fails,
+- how old token mappings are retired.
+
+The error context matters. `Could not resolve IRS.Notional` is better than `Cannot read property amount of undefined`, but it still may not be enough. A better failure includes the formula id, token, source type, configured path, expected type, and where validation last passed.
+
+Lenses create a place to attach ownership, compatibility checks, and operational signals to paths that already mattered but were previously scattered through the codebase.
+
+## Beyond Lenses
 
 Lenses focus on a part that exists. Real data is often less cooperative.
 
-A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. This is what **prisms** are for: they focus on one possible variant of a larger type.
+A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. **Prisms** handle that case by focusing on one possible variant of a larger type.
 
 Arrays and collections need a different abstraction. If you want to update every leg, every cashflow, or every matching row, you are in **traversal** territory.
 
 You do not need to implement all of these yourself. If you want production-grade optics in TypeScript, look at [`monocle-ts`](https://gcanti.github.io/monocle-ts/). If you only need path-based access and can tolerate weaker type guarantees, Ramda's [`lensPath`](https://ramdajs.com/docs/#lensPath) may be enough.
 
-The decision should be boring:
+Choose the smallest abstraction that covers the case:
 
-- use object spread for shallow one-off updates,
-- use named lenses for repeated nested immutable access,
-- use prisms when the target may not exist because of the shape of the type,
-- use traversals when there may be many targets,
-- use a library when the abstraction becomes central to the system.
+- object spread for shallow one-off updates,
+- named lenses for repeated nested immutable access,
+- prisms when the target may not exist because of the shape of the type,
+- traversals when there may be many targets,
+- a library when the abstraction becomes central to the system.
 
-Do not introduce optics because they are elegant. Introduce them when they remove duplicated path logic and make correctness easier to check.
+Introduce optics when they remove duplicated path logic and make correctness easier to check. Elegance is a side effect, not the justification.
 
 ## Practical Guidance
 
 If you are adopting this pattern in a TypeScript codebase, start small.
 
-Pick one domain object with repeated nested updates. Replace the duplicated object-spread logic with a small set of named lenses. Add tests for the lens laws. Stop there. If the code gets clearer, continue. If it gets more abstract without removing real duplication, revert it.
+Pick one domain object with repeated nested updates. Replace the duplicated object-spread logic with a small set of named lenses, add tests for the lens laws, and stop there. If the code gets clearer, continue. If it gets more abstract without removing real duplication, revert it.
 
-For configuration-driven access, treat configuration like code:
+Use runtime configuration only when the path has to cross a boundary: formula definitions, client mappings, reporting metadata, import specifications, or other data that lives outside the compiled TypeScript module. Keep ordinary application code on typed lenses where possible.
 
-- version it,
-- validate it at startup,
-- test it against representative fixtures,
-- cache parsed/generated lenses,
-- surface failures with enough context to debug the bad token or path,
-- avoid pretending runtime paths have compile-time guarantees.
+A senior reviewer will object less to the unfamiliar pattern than to hidden failure. Make the failure mode visible and the abstraction becomes much easier to defend.
 
-This last point matters. A senior reviewer will not object to lenses because the pattern is unfamiliar. They will object if the pattern hides failure. Make the failure mode visible and the abstraction becomes much easier to defend.
+## Putting It to Work
 
-## Conclusion
+Lenses give repeated or risky paths through immutable data a name. Once the path is named, you can compose access, test update behavior, and remove hand-written cloning code from business logic.
 
-Lenses are a small idea with a practical payoff: give important paths through immutable data a name.
+Object spread remains the right tool for shallow one-off updates. Lenses fit better when the codebase has nested domain models, repeated updates, and configurable mappings.
 
-That name lets you compose access, test update behavior, and remove hand-written cloning code from business logic. In simple cases, object spread is still the right tool. In complex systems with nested domain models, repeated updates, and configurable mappings, lenses provide a useful middle ground between ad-hoc property access and a full persistence/query layer.
+The pattern has costs. Runtime configuration weakens type guarantees. Optional fields and unions require more than basic lenses. Teams need to understand the laws well enough to test them. Adopt the pattern when duplicated path knowledge is already creating review risk, schema migration risk, or production failure risk. Leave it alone when the update is local and shallow.
 
-The pattern is not free. Runtime configuration weakens type guarantees. Optional fields and unions require more than basic lenses. Teams need to understand the laws well enough to test them. But these costs are bounded, and they are usually smaller than the cost of debugging silent mutation or duplicated path logic across a large codebase.
-
-Monday morning: find one nested immutable update that appears in more than one place. Give the path a name. Write the three lens-law tests. If the code becomes easier to read, you have your first useful lens.
+Monday morning: find one nested immutable update that appears in more than one place. Give the path a name. Write the three lens-law tests. If the code becomes easier to read, keep it.
 
 ## References
 
