@@ -1,7 +1,7 @@
 ---
 title: "Composable Data Access with Lenses"
 description: "How lenses make nested immutable updates explicit, reusable, and testable without turning ordinary TypeScript into a functional programming ceremony."
-date: "2025-05-02"
+date: "2026-05-28"
 draft: false
 ---
 
@@ -298,6 +298,8 @@ In systems that handle money, silent `undefined` usually becomes a badly timed b
 Typed lenses are a local abstraction. Runtime-configured lenses are a system boundary.
 
 The boundary needs ownership. A token such as `IRS.Notional` may be referenced by formulas, report definitions, client mappings, and support runbooks. A change to the underlying object shape can break all of them without changing a single formula. At that point, lens configuration should be treated like routing rules or database migrations: versioned, reviewed, validated, and observable.
+
+During a schema migration, `IRS.Notional` might move from `notionalAmount` to `trade.economics.notional.amount`. Formulas keep referencing `IRS.Notional`; only the mapping changes. A validation job should load representative v2 fixtures, resolve the token, assert that the result is a number, and fail the deployment if the old path is still configured. Without that check, the abstraction has only moved a property access bug into configuration.
 
 A production setup should make a few things explicit:
 
