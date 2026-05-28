@@ -318,11 +318,9 @@ The error context matters. `Could not resolve IRS.Notional` is better than `Cann
 
 Lenses create a place to attach ownership, compatibility checks, and operational signals to paths that already mattered but were previously scattered through the codebase.
 
-The pattern still assumes the path always exists and points to a single value. Discriminated unions, optional fields, and collections all break that assumption.
-
 ## Prisms, Traversals, and Libraries
 
-Lenses focus on a part that exists.
+Lenses assume the path always exists and points to a single value. Discriminated unions, optional fields, and collections all break that assumption.
 
 A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. **Prisms** focus on one possible variant of a larger type.
 
