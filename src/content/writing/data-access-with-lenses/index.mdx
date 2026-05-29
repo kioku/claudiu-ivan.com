@@ -93,23 +93,33 @@ A codebase should not rely on "be careful" as its enforcement mechanism. If a pa
 A lens is a pair of functions that knows how to look at part of a structure and how to replace that part immutably.
 
 ```typescript
+type Result<T, E> =
+  | { readonly _tag: "Ok"; readonly value: T }
+  | { readonly _tag: "Err"; readonly error: E };
+
+type ViewResult<A> = Result<A, string>;
+type SetResult<S> = Result<S, string>;
+
 interface Lens<S, A> {
-  readonly view: (source: S) => A;
-  readonly set: (source: S, newValue: A) => S;
+  readonly view: (source: S) => ViewResult<A>;
+  readonly set: (source: S, newValue: A) => SetResult<S>;
 }
 ```
 
-`S` is the source, the larger structure. `A` is the part being focused.
+`S` is the source, the larger structure. `A` is the part being focused. The `Result` channel is small for property lenses, but it becomes important once paths come from runtime configuration and a lookup can fail.
 
 A lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Compose them, and you get a lens from `IRS` directly to the floating leg's rate.
 
-The smallest useful building block is [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/a357dc3/playground/data-access-with-lenses/lens-core.ts#L16), which focuses on a single property:
+The smallest useful building block is [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/f952117dca95731aec13916cee23ed265f98a324/playground/data-access-with-lenses/lens-core.ts#L23), which focuses on a single property:
 
 ```typescript
 function lensProp<S, K extends keyof S>(prop: K): Lens<S, S[K]> {
   return {
-    view: (source) => source[prop],
-    set: (source, newValue) => ({ ...source, [prop]: newValue }),
+    view: (source) =>
+      source && typeof source === "object" && prop in source
+        ? ok(source[prop])
+        : err(`Property '${String(prop)}' not found on source object.`),
+    set: (source, newValue) => ok({ ...source, [prop]: newValue }),
   };
 }
 
@@ -117,7 +127,7 @@ const floatingLegLens = lensProp<IRS, "floatingLeg">("floatingLeg");
 const rateLens = lensProp<Leg, "rate">("rate");
 ```
 
-The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/a357dc3/playground/data-access-with-lenses/lens-core.ts#L34) extends its reach:
+The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/f952117dca95731aec13916cee23ed265f98a324/playground/data-access-with-lenses/lens-core.ts#L41) extends its reach:
 
 ```typescript
 function composeLens<S, B, A>(
@@ -125,24 +135,37 @@ function composeLens<S, B, A>(
   inner: Lens<B, A>
 ): Lens<S, A> {
   return {
-    view: (source) => inner.view(outer.view(source)),
-    set: (source, newValue) =>
-      outer.set(source, inner.set(outer.view(source), newValue)),
+    view: (source) => {
+      const outerView = outer.view(source);
+      if (isErr(outerView)) return outerView;
+      return inner.view(outerView.value);
+    },
+    set: (source, newValue) => {
+      const outerView = outer.view(source);
+      if (isErr(outerView)) return outerView;
+
+      const innerSet = inner.set(outerView.value, newValue);
+      if (isErr(innerSet)) return innerSet;
+
+      return outer.set(source, innerSet.value);
+    },
   };
 }
 
 const floatingRateLens = composeLens(floatingLegLens, rateLens);
 ```
 
-The composed `set` does three things: view the intermediate value, update it through the inner lens, then write the updated intermediate value back through the outer lens. The caller does not need to remember how many levels of object spread are required.
+The composed `set` does three things: view the intermediate value, update it through the inner lens, then write the updated intermediate value back through the outer lens. If either step fails, the failure is propagated as `Err` instead of being thrown. The caller does not need to remember how many levels of object spread are required.
 
 ```typescript
 const currentRate = floatingRateLens.view(irs);
-const updatedIrs = floatingRateLens.set(irs, {
-  type: "Floating",
-  index: "SOFR",
-  spread: 0.004,
-});
+if (isOk(currentRate)) {
+  const updatedIrs = floatingRateLens.set(irs, {
+    type: "Floating",
+    index: "SOFR",
+    spread: 0.004,
+  });
+}
 ```
 
 Naming the path changes the maintenance model. A named path can be reused, tested, composed, and discussed in code review without re-reading object spread syntax. That trust is only earned if the lens behaves predictably under composition and repeated updates, which is what the lens laws describe.
@@ -151,25 +174,34 @@ Naming the path changes the maintenance model. A named path can be reused, teste
 
 Lenses come with three laws. They are short enough to memorize and useful as tests.
 
-The view-set law: viewing a value and setting it back should leave the source unchanged.
+The view-set law: if viewing succeeds, setting the same value back should leave the source unchanged.
 
 ```typescript
-lens.set(source, lens.view(source)) === source;
+const viewed = lens.view(source);
+if (isOk(viewed)) {
+  deepEqual(lens.set(source, viewed.value), ok(source));
+}
 ```
 
-The set-view law: setting a value and immediately viewing it should return the value you set.
+The set-view law: if setting succeeds, immediately viewing the updated source should return the value you set.
 
 ```typescript
-lens.view(lens.set(source, value)) === value;
+const updated = lens.set(source, value);
+if (isOk(updated)) {
+  deepEqual(lens.view(updated.value), ok(value));
+}
 ```
 
 The set-set law: setting a value and then setting another value is equivalent to setting the second value directly.
 
 ```typescript
-lens.set(lens.set(source, a), b) === lens.set(source, b);
+const first = lens.set(source, a);
+if (isOk(first)) {
+  deepEqual(lens.set(first.value, b), lens.set(source, b));
+}
 ```
 
-The laws make good tests because they are easy to state and easy to violate. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. The laws are expressed over all valid inputs rather than one hand-picked example, which is what property-based testing is for. The companion code [exercises each law with `fast-check`](https://github.com/kioku/claudiu-ivan.com/blob/a357dc3/playground/data-access-with-lenses/lens-core.test.ts).
+The laws make good tests because they are easy to state and easy to violate. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. The laws are expressed over all valid inputs rather than one hand-picked example, which is what property-based testing is for. The companion code [exercises each law with `fast-check`](https://github.com/kioku/claudiu-ivan.com/blob/f952117dca95731aec13916cee23ed265f98a324/playground/data-access-with-lenses/lens-core.test.ts#L42).
 
 So far the lens shape is purely typed and every focus is known at compile time. Real systems often need paths that come from configuration, and that boundary changes what the type system can prove.
 
@@ -193,26 +225,32 @@ const optionStrikeConfig: LensConfig = {
 };
 ```
 
-[`createLensFromConfig`](https://github.com/kioku/claudiu-ivan.com/blob/a357dc3/playground/data-access-with-lenses/lens-configurable.ts#L85) walks that path at runtime:
+[`createLensFromConfig`](https://github.com/kioku/claudiu-ivan.com/blob/f952117dca95731aec13916cee23ed265f98a324/playground/data-access-with-lenses/lens-configurable.ts#L81) walks that path at runtime:
 
 ```typescript
 function createLensFromConfig<S extends object, A>(
   config: LensConfig
-): Lens<S, A> {
-  return {
+): Result<Lens<S, A>, string> {
+  if (config.getterPath.length === 0) {
+    return err("LensConfig requires a non-empty getterPath");
+  }
+
+  return ok({
     view: (source) => {
-      let current: any = source;
+      let current: unknown = source;
       for (const key of config.getterPath) {
-        current = current[key];
+        const next = validatePathElement(current, key, config.getterPath);
+        if (isErr(next)) return next;
+        current = next.value;
       }
-      return current as A;
+      return ok(current as A);
     },
     set: (source, newValue) => {
-      // Usually implemented with Immer or a similar structural sharing helper.
-      // The full companion code includes a safer implementation with path checks.
-      throw new Error("set implementation omitted for brevity");
+      // The full companion code uses Immer and validates intermediates
+      // before writing so path failures return Err instead of throwing.
+      return setPathWithImmer(source, config.getterPath, newValue);
     },
-  };
+  });
 }
 ```
 
@@ -232,19 +270,18 @@ A production version needs to answer several questions explicitly:
 The companion implementation returns a [`Result`](/writing/type-safe-error-handling)-shaped value instead of pretending every path lookup succeeds:
 
 ```typescript
-type ViewResult<A> =
-  | { readonly success: true; readonly value: A }
-  | { readonly success: false; readonly error: string };
+type ViewResult<A> = Result<A, string>;
+type SetResult<S> = Result<S, string>;
 
 interface Lens<S, A> {
   readonly view: (source: S) => ViewResult<A>;
-  readonly set: (source: S, newValue: A) => S;
+  readonly set: (source: S, newValue: A) => SetResult<S>;
 }
 ```
 
-`ViewResult<A>` is structurally `Result<A, string>`. The formula engine in the next section uses a discriminated union of failure modes instead of a bare string; a production version would extend each variant with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
+`ViewResult<A>` and `SetResult<S>` use the same `_tag: "Ok" | "Err"` discriminant as the shared `Result` type. The formula engine in the next section uses a discriminated union of failure modes instead of a bare string; a production version would extend each variant with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
 
-Once `view` returns a `ViewResult`, a configuration-driven formula engine becomes a reasonable thing to build on top.
+Once `view` and `set` return `Result`, a configuration-driven formula engine becomes a reasonable thing to build on top.
 
 ## A Token-Driven Formula Engine
 
@@ -256,49 +293,61 @@ PresentValue = DiscountFactor * IRS.Notional
 
 The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. It should refer to the concept while the mapping layer handles the location.
 
-[`evaluateFormula`](https://github.com/kioku/claudiu-ivan.com/blob/a357dc3/playground/data-access-with-lenses/formula-engine.ts#L48) loops over each token a formula requires, resolves it through a configured lens, and passes the results to the formula's `execute`:
+[`evaluateFormula`](https://github.com/kioku/claudiu-ivan.com/blob/f952117dca95731aec13916cee23ed265f98a324/playground/data-access-with-lenses/formula-engine.ts#L88) loops over each token a formula requires, resolves it through a configured lens, and passes the results to the formula's `execute`:
 
 ```typescript
-type FormulaResult = number | string | boolean | object | null;
-
-interface FormulaDefinition {
-  readonly getRequiredTokens: () => string[];
-  readonly execute: (inputs: Record<string, unknown>) => FormulaResult;
-}
+type FormulaResultOutput = number | string | boolean | object | null | undefined;
 
 type FormulaError =
+  | { readonly kind: "MissingFormulaDefinition"; readonly formulaId: string }
   | { readonly kind: "MissingLensConfig"; readonly token: string }
-  | { readonly kind: "ResolutionFailed"; readonly token: string; readonly reason: string };
+  | { readonly kind: "InvalidLensConfig"; readonly token: string; readonly reason: string }
+  | { readonly kind: "ResolutionFailed"; readonly token: string; readonly reason: string }
+  | { readonly kind: "ExecutionThrew"; readonly formulaId: string; readonly message: string };
 
 function evaluateFormula(
   formulaId: string,
   dataContext: object
-): Result<FormulaResult, FormulaError> {
+): Result<FormulaResultOutput, FormulaError> {
   const formula = lookupFormulaDefinition(formulaId);
-  const inputs: Record<string, unknown> = {};
+  if (!formula) {
+    return err({ kind: "MissingFormulaDefinition", formulaId });
+  }
+
+  const inputs: Record<string, FormulaResultOutput> = {};
 
   for (const token of formula.getRequiredTokens()) {
     const config = lookupLensConfig(token);
     if (!config) {
-      return { success: false, error: { kind: "MissingLensConfig", token } };
+      return err({ kind: "MissingLensConfig", token });
     }
 
-    const result = createLensFromConfig(config).view(dataContext);
-    if (!result.success) {
-      return {
-        success: false,
-        error: { kind: "ResolutionFailed", token, reason: result.error },
-      };
+    const lensResult = createLensFromConfig(config);
+    if (isErr(lensResult)) {
+      return err({ kind: "InvalidLensConfig", token, reason: lensResult.error });
     }
 
-    inputs[token] = result.value;
+    const viewResult = lensResult.value.view(dataContext);
+    if (isErr(viewResult)) {
+      return err({ kind: "ResolutionFailed", token, reason: viewResult.error });
+    }
+
+    inputs[token] = viewResult.value;
   }
 
-  return { success: true, value: formula.execute(inputs) };
+  try {
+    return ok(formula.execute(inputs));
+  } catch (e) {
+    return err({
+      kind: "ExecutionThrew",
+      formulaId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
 }
 ```
 
-The function never throws. `FormulaError` distinguishes a missing configuration from a path that fails to resolve, and each variant carries the token. Callers handle both the success and failure arms, and TypeScript flags any missed case.
+The engine's own paths never throw. `FormulaError` distinguishes missing formula definitions, missing token configuration, invalid lens configuration, failed path resolution, and formula-author exceptions. Callers branch on the `Ok`/`Err` discriminant with `isOk` or `isErr`, and TypeScript flags any missed error case once they switch on `error.kind`.
 
 Formulas hold the business logic, lens configuration locates the data, and validation catches bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and a typed error channel rather than thrown exceptions.
 
