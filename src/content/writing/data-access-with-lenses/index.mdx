@@ -110,48 +110,16 @@ interface Lens<S, A> {
 
 A lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Compose them, and you get a lens from `IRS` directly to the floating leg's rate.
 
-The smallest useful building block is [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/04b5eeb43a861039f6fc83eccaf29859b881cee9/playground/data-access-with-lenses/lens-core.ts#L23), which focuses on a single property:
+The smallest useful building block is [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L23), which focuses on a single property:
 
 ```typescript
-function lensProp<S, K extends keyof S>(prop: K): Lens<S, S[K]> {
-  return {
-    view: (source) =>
-      source && typeof source === "object" && prop in source
-        ? ok(source[prop])
-        : err(`Property '${String(prop)}' not found on source object.`),
-    set: (source, newValue) => ok({ ...source, [prop]: newValue }),
-  };
-}
-
 const floatingLegLens = lensProp<IRS, "floatingLeg">("floatingLeg");
 const rateLens = lensProp<Leg, "rate">("rate");
 ```
 
-The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/04b5eeb43a861039f6fc83eccaf29859b881cee9/playground/data-access-with-lenses/lens-core.ts#L41) extends its reach:
+The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L41) extends its reach:
 
 ```typescript
-function composeLens<S, B, A>(
-  outer: Lens<S, B>,
-  inner: Lens<B, A>
-): Lens<S, A> {
-  return {
-    view: (source) => {
-      const outerView = outer.view(source);
-      if (isErr(outerView)) return outerView;
-      return inner.view(outerView.value);
-    },
-    set: (source, newValue) => {
-      const outerView = outer.view(source);
-      if (isErr(outerView)) return outerView;
-
-      const innerSet = inner.set(outerView.value, newValue);
-      if (isErr(innerSet)) return innerSet;
-
-      return outer.set(source, innerSet.value);
-    },
-  };
-}
-
 const floatingRateLens = composeLens(floatingLegLens, rateLens);
 ```
 
@@ -201,9 +169,9 @@ if (isOk(first)) {
 }
 ```
 
-The laws make good tests because they are easy to state and easy to violate. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. The laws are expressed over all valid inputs rather than one hand-picked example, which is what property-based testing is for. The companion code [exercises each law with `fast-check`](https://github.com/kioku/claudiu-ivan.com/blob/04b5eeb43a861039f6fc83eccaf29859b881cee9/playground/data-access-with-lenses/lens-core.test.ts#L42).
+The laws make good tests because they are easy to state and easy to violate. A broken lens is worse than no abstraction because it gives a bad update path a trustworthy name. The laws are expressed over all valid inputs rather than one hand-picked example, which is what property-based testing is for. The companion code [exercises each law with `fast-check`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.test.ts#L42).
 
-So far the lens shape is purely typed and every focus is known at compile time. Real systems often need paths that come from configuration, and that boundary changes what the type system can prove.
+So far every focused path is chosen at compile time. Real systems often need paths that come from configuration, and that boundary changes what the type system can prove.
 
 ## Runtime-Configured Lenses
 
@@ -225,38 +193,15 @@ const optionStrikeConfig: LensConfig = {
 };
 ```
 
-[`createLensFromConfig`](https://github.com/kioku/claudiu-ivan.com/blob/04b5eeb43a861039f6fc83eccaf29859b881cee9/playground/data-access-with-lenses/lens-configurable.ts#L176) walks that path at runtime:
+[`createLensFromConfig`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-configurable.ts#L176) walks that path at runtime. The article does not need the full traversal implementation; the important contract is the return type:
 
 ```typescript
 function createLensFromConfig<S extends object, A>(
   config: LensConfig
-): Result<Lens<S, A>, string> {
-  if (config.getterPath.length === 0) {
-    return err("LensConfig requires a non-empty getterPath");
-  }
-
-  const view = (source: S): ViewResult<A> => {
-    const result = config.getterPath.reduce<Result<unknown, string>>(
-      (currentResult, pathElement) =>
-        isErr(currentResult)
-          ? currentResult
-          : validatePathElement(currentResult.value, pathElement, config.getterPath),
-      ok(source)
-    );
-
-    return isErr(result) ? result : ok(result.value as A);
-  };
-
-  const set = (source: S, newValue: A): SetResult<S> => {
-    const parentResult = validateSetIntermediates(source, config.getterPath);
-    return isErr(parentResult)
-      ? parentResult
-      : ok(setPathValue(source, config.getterPath, newValue) as S);
-  };
-
-  return ok({ view, set });
-}
+): Result<Lens<S, A>, string>;
 ```
+
+The companion implementation validates the configuration, resolves `view` through the configured path, validates intermediate objects before `set`, and returns `Err` instead of throwing when the path is not usable.
 
 Generated lenses lose some of the guarantees that made the hand-written version attractive. A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is a valid path for `IRS`, that the value at the end is a number, or that the rate is in the `Floating` variant by the time it is reached. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
 
@@ -297,58 +242,32 @@ PresentValue = DiscountFactor * IRS.Notional
 
 The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. It should refer to the concept while the mapping layer handles the location.
 
-The formula engine resolves each token through a configured lens, then [`evaluateFormula`](https://github.com/kioku/claudiu-ivan.com/blob/04b5eeb43a861039f6fc83eccaf29859b881cee9/playground/data-access-with-lenses/formula-engine.ts#L116) passes the resolved inputs to the formula's `execute`:
+The formula engine resolves each token through a configured lens, then [`evaluateFormula`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts#L139) passes the resolved inputs to the formula's `execute`:
 
 ```typescript
 type FormulaResultOutput = number | string | boolean | object | null | undefined;
+
+interface FormulaDefinition {
+  readonly getRequiredTokens: () => string[];
+  readonly execute: (
+    inputs: Record<string, FormulaResultOutput>
+  ) => Result<FormulaResultOutput, string>;
+}
 
 type FormulaError =
   | { readonly kind: "MissingFormulaDefinition"; readonly formulaId: string }
   | { readonly kind: "MissingLensConfig"; readonly token: string }
   | { readonly kind: "InvalidLensConfig"; readonly token: string; readonly reason: string }
   | { readonly kind: "ResolutionFailed"; readonly token: string; readonly reason: string }
-  | { readonly kind: "ExecutionThrew"; readonly formulaId: string; readonly message: string };
-
-function resolveFormulaInputs(
-  tokens: readonly string[],
-  dataContext: object
-): Result<Record<string, FormulaResultOutput>, FormulaError> {
-  return tokens.reduce<Result<Record<string, FormulaResultOutput>, FormulaError>>(
-    (inputsResult, token) => {
-      if (isErr(inputsResult)) return inputsResult;
-
-      const tokenResult = resolveTokenInput(token, dataContext);
-      if (isErr(tokenResult)) return tokenResult;
-
-      const [resolvedToken, value] = tokenResult.value;
-      return ok({ ...inputsResult.value, [resolvedToken]: value });
-    },
-    ok({})
-  );
-}
+  | { readonly kind: "ExecutionFailed"; readonly formulaId: string; readonly reason: string };
 
 function evaluateFormula(
   formulaId: string,
   dataContext: object
-): Result<FormulaResultOutput, FormulaError> {
-  const formula = lookupFormulaDefinition(formulaId);
-  if (!formula) {
-    return err({ kind: "MissingFormulaDefinition", formulaId });
-  }
-
-  const inputsResult = resolveFormulaInputs(formula.getRequiredTokens(), dataContext);
-  if (isErr(inputsResult)) {
-    return inputsResult;
-  }
-
-  const result = captureException(() => formula.execute(inputsResult.value));
-  return isErr(result)
-    ? err({ kind: "ExecutionThrew", formulaId, message: result.error.message })
-    : result;
-}
+): Result<FormulaResultOutput, FormulaError>;
 ```
 
-The engine converts lookup and path-resolution failures into `Err`. Formula-author exceptions from `execute` are captured at the boundary and reported as `ExecutionThrew`. Callers branch on the `Ok`/`Err` discriminant with `isOk` or `isErr`, and TypeScript flags any missed error case once they switch on `error.kind`.
+The engine converts lookup, configuration, path-resolution, and formula execution failures into `Err`. Formula code returns `Result` directly; the example project does not need `try/catch`, and its formula definitions do not throw. Callers branch on the `Ok`/`Err` discriminant with `isOk` or `isErr`, and TypeScript flags any missed error case once they switch on `error.kind`.
 
 Formulas hold the business logic, lens configuration locates the data, and validation detects bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and a typed error channel rather than thrown exceptions.
 
@@ -377,7 +296,7 @@ Lenses create a place to attach ownership, compatibility checks, and operational
 
 ## Prisms, Traversals, and Libraries
 
-Lenses assume the path always exists and points to a single value. Discriminated unions, optional fields, and collections all break that assumption.
+Classical lenses assume the path always exists and points to a single value. This article's `Result`-returning lenses make failure explicit, but optional fields, discriminated unions, and collections still need more precise optics.
 
 A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. **Prisms** focus on one possible variant of a larger type.
 
