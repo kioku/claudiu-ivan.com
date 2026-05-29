@@ -1,4 +1,10 @@
-import { type Result, ok, err, isErr } from "result-option-types";
+import {
+  type Result,
+  ok,
+  err,
+  isErr,
+  captureException,
+} from "result-option-types";
 import { createLensFromConfig, type LensConfig } from "./lens-configurable";
 
 export type FormulaInputValue =
@@ -43,25 +49,28 @@ export type FormulaError =
 
 // Mock storage for formula engine dependencies.
 // In a real app these would come from a database, config files, or a service.
-const LENS_CONFIGS_REGISTRY: Record<string, LensConfig> = {};
-const FORMULA_DEFINITIONS_REGISTRY: Record<string, FormulaDefinition> = {};
+let lensConfigsRegistry: Readonly<Record<string, LensConfig>> = {};
+let formulaDefinitionsRegistry: Readonly<Record<string, FormulaDefinition>> = {};
 
 export function registerLensConfig(token: string, config: LensConfig): void {
-  LENS_CONFIGS_REGISTRY[token] = config;
+  lensConfigsRegistry = { ...lensConfigsRegistry, [token]: config };
 }
 
 export function registerFormulaDefinition(definition: FormulaDefinition): void {
-  FORMULA_DEFINITIONS_REGISTRY[definition.id] = definition;
+  formulaDefinitionsRegistry = {
+    ...formulaDefinitionsRegistry,
+    [definition.id]: definition,
+  };
 }
 
 export function lookupLensConfig(token: string): LensConfig | undefined {
-  return LENS_CONFIGS_REGISTRY[token];
+  return lensConfigsRegistry[token];
 }
 
 export function lookupFormulaDefinition(
   id: string
 ): FormulaDefinition | undefined {
-  return FORMULA_DEFINITIONS_REGISTRY[id];
+  return formulaDefinitionsRegistry[id];
 }
 
 /**
@@ -70,20 +79,76 @@ export function lookupFormulaDefinition(
  * test runs.
  */
 export function clearRegistries(): void {
-  for (const key of Object.keys(LENS_CONFIGS_REGISTRY)) {
-    delete LENS_CONFIGS_REGISTRY[key];
-  }
-  for (const key of Object.keys(FORMULA_DEFINITIONS_REGISTRY)) {
-    delete FORMULA_DEFINITIONS_REGISTRY[key];
-  }
+  lensConfigsRegistry = {};
+  formulaDefinitionsRegistry = {};
 }
+
+function resolveTokenInput(
+  token: string,
+  dataContext: object
+): Result<readonly [string, FormulaInputValue], FormulaError> {
+  const config = lookupLensConfig(token);
+  if (!config) {
+    return err({ kind: "MissingLensConfig", token });
+  }
+
+  const lensResult = createLensFromConfig<object, FormulaInputValue>(config);
+  if (isErr(lensResult)) {
+    return err({
+      kind: "InvalidLensConfig",
+      token,
+      reason: lensResult.error,
+    });
+  }
+
+  const viewResult = lensResult.value.view(dataContext);
+  if (isErr(viewResult)) {
+    return err({
+      kind: "ResolutionFailed",
+      token,
+      reason: viewResult.error,
+    });
+  }
+
+  return ok([token, viewResult.value]);
+}
+
+function resolveFormulaInputs(
+  tokens: readonly string[],
+  dataContext: object
+): Result<Record<string, FormulaInputValue>, FormulaError> {
+  return tokens.reduce<Result<Record<string, FormulaInputValue>, FormulaError>>(
+    (inputsResult, token) => {
+      if (isErr(inputsResult)) {
+        return inputsResult;
+      }
+
+      const tokenResult = resolveTokenInput(token, dataContext);
+      if (isErr(tokenResult)) {
+        return tokenResult;
+      }
+
+      const [resolvedToken, value] = tokenResult.value;
+      return ok({ ...inputsResult.value, [resolvedToken]: value });
+    },
+    ok({})
+  );
+}
+
+const executionError = (
+  formulaId: string,
+  error: Error
+): FormulaError => ({
+  kind: "ExecutionThrew",
+  formulaId,
+  message: error.message,
+});
 
 /**
  * Resolve a formula's token inputs through configured lenses and run its
  * execute function. Returns Err with a typed FormulaError instead of
- * throwing; the only throw the engine cannot fully avoid is a
- * formula-author bug inside execute, which is captured and reported as
- * ExecutionThrew.
+ * throwing; formula-author bugs inside execute are captured and reported
+ * as ExecutionThrew.
  */
 export function evaluateFormula(
   formulaId: string,
@@ -94,38 +159,18 @@ export function evaluateFormula(
     return err({ kind: "MissingFormulaDefinition", formulaId });
   }
 
-  const inputs: Record<string, FormulaInputValue> = {};
-
-  for (const token of formula.getRequiredTokens()) {
-    const config = lookupLensConfig(token);
-    if (!config) {
-      return err({ kind: "MissingLensConfig", token });
-    }
-
-    const lensResult = createLensFromConfig<object, FormulaInputValue>(config);
-    if (isErr(lensResult)) {
-      return err({
-        kind: "InvalidLensConfig",
-        token,
-        reason: lensResult.error,
-      });
-    }
-
-    const viewResult = lensResult.value.view(dataContext);
-    if (isErr(viewResult)) {
-      return err({
-        kind: "ResolutionFailed",
-        token,
-        reason: viewResult.error,
-      });
-    }
-    inputs[token] = viewResult.value;
+  const inputsResult = resolveFormulaInputs(
+    formula.getRequiredTokens(),
+    dataContext
+  );
+  if (isErr(inputsResult)) {
+    return inputsResult;
   }
 
-  try {
-    return ok(formula.execute(inputs));
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e);
-    return err({ kind: "ExecutionThrew", formulaId, message });
+  const result = captureException(() => formula.execute(inputsResult.value));
+  if (isErr(result)) {
+    return err(executionError(formulaId, result.error));
   }
+
+  return result;
 }

@@ -1,4 +1,3 @@
-import { produce } from "immer";
 import { type Result, ok, err, isErr } from "result-option-types";
 import { type Lens, type ViewResult, type SetResult } from "./lens-core";
 
@@ -12,6 +11,11 @@ const pathError = (
   message: string,
   path: ReadonlyArray<string | number>
 ): string => `${message}. Path: ${path.join(".")}`;
+
+const readProperty = (
+  source: object,
+  pathElement: string | number
+): unknown => (source as Record<string | number, unknown>)[pathElement];
 
 function validatePathElement<T>(
   current: unknown,
@@ -64,8 +68,98 @@ function validatePathElement<T>(
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ok((current as any)[pathElement] as T);
+  return ok(readProperty(current, pathElement) as T);
+}
+
+function validateSetIntermediates(
+  source: object,
+  path: ReadonlyArray<string | number>
+): Result<unknown, string> {
+  return path.slice(0, -1).reduce<Result<unknown, string>>(
+    (cursorResult, pathElement) => {
+      if (isErr(cursorResult)) {
+        return cursorResult;
+      }
+
+      const cursor = cursorResult.value;
+      if (cursor === null || typeof cursor !== "object") {
+        return err(
+          `Invalid path element '${String(
+            pathElement
+          )}' during set: parent is not an object or property does not exist.`
+        );
+      }
+
+      const next = readProperty(cursor, pathElement);
+      if (next === null || typeof next !== "object") {
+        return err(
+          `Invalid path element '${String(
+            pathElement
+          )}' during set: parent is not an object or property does not exist.`
+        );
+      }
+
+      return ok(next);
+    },
+    ok(source)
+  );
+}
+
+const replaceArrayElement = (
+  source: readonly unknown[],
+  index: number,
+  newValue: unknown
+): readonly unknown[] => {
+  if (index < source.length) {
+    return [...source.slice(0, index), newValue, ...source.slice(index + 1)];
+  }
+
+  return [
+    ...source,
+    ...Array.from({ length: index - source.length }, () => undefined),
+    newValue,
+  ];
+};
+
+function replaceProperty(
+  source: unknown,
+  pathElement: string | number,
+  newValue: unknown
+): unknown {
+  if (Array.isArray(source) && typeof pathElement === "number") {
+    return replaceArrayElement(source, pathElement, newValue);
+  }
+
+  if (source !== null && typeof source === "object") {
+    return { ...source, [pathElement]: newValue };
+  }
+
+  return source;
+}
+
+function setPathValue(
+  source: unknown,
+  path: ReadonlyArray<string | number>,
+  newValue: unknown
+): unknown {
+  const [head, ...tail] = path;
+  if (head === undefined) {
+    return newValue;
+  }
+
+  if (tail.length === 0) {
+    return replaceProperty(source, head, newValue);
+  }
+
+  if (source === null || typeof source !== "object") {
+    return source;
+  }
+
+  return replaceProperty(
+    source,
+    head,
+    setPathValue(readProperty(source, head), tail, newValue)
+  );
 }
 
 /**
@@ -75,8 +169,9 @@ function validatePathElement<T>(
  * by Err when the path does not resolve, and set fails by Err when an
  * intermediate object is missing.
  *
- * Caveats: Relies on 'any' internally. Correctness of 'A' depends on LensConfig.
- * Does not inherently handle discriminated unions safely within path traversal without more complex config.
+ * Caveats: Correctness of 'A' depends on LensConfig. Does not inherently
+ * handle discriminated unions safely within path traversal without more
+ * complex config.
  */
 export function createLensFromConfig<S extends object, A>(
   config: LensConfig
@@ -86,58 +181,33 @@ export function createLensFromConfig<S extends object, A>(
   }
 
   const view = (source: S): ViewResult<A> => {
-    let current: unknown = source;
+    const result = config.getterPath.reduce<Result<unknown, string>>(
+      (currentResult, pathElement) => {
+        if (isErr(currentResult)) {
+          return currentResult;
+        }
+        return validatePathElement<unknown>(
+          currentResult.value,
+          pathElement,
+          config.getterPath
+        );
+      },
+      ok(source)
+    );
 
-    for (const pathElement of config.getterPath) {
-      const validationResult = validatePathElement<unknown>(
-        current,
-        pathElement,
-        config.getterPath
-      );
-      if (isErr(validationResult)) {
-        return validationResult;
-      }
-      current = validationResult.value;
+    if (isErr(result)) {
+      return result;
     }
-
-    return ok(current as A);
+    return ok(result.value as A);
   };
 
   const set = (source: S, newValue: A): SetResult<S> => {
-    // Pre-validate intermediates so set fails by Err rather than throw
-    // when a parent is missing or not an object.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let cursor: any = source;
-    for (let i = 0; i < config.getterPath.length - 1; i++) {
-      const head = config.getterPath[i];
-      if (head === undefined) {
-        break;
-      }
-      if (cursor[head] === null || typeof cursor[head] !== "object") {
-        return err(
-          `Invalid path element '${String(
-            head
-          )}' during set: parent is not an object or property does not exist.`
-        );
-      }
-      cursor = cursor[head];
+    const parentResult = validateSetIntermediates(source, config.getterPath);
+    if (isErr(parentResult)) {
+      return parentResult;
     }
 
-    const updated = produce(source, (draft) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let current: any = draft;
-      for (let i = 0; i < config.getterPath.length - 1; i++) {
-        const head = config.getterPath[i];
-        if (head !== undefined) {
-          current = current[head];
-        }
-      }
-      const last = config.getterPath[config.getterPath.length - 1];
-      if (last !== undefined) {
-        current[last] = newValue;
-      }
-    });
-    return ok(updated);
+    return ok(setPathValue(source, config.getterPath, newValue) as S);
   };
 
   return ok({ view, set });
