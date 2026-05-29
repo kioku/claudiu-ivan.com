@@ -18,10 +18,8 @@ Path duplication is a second cost. When a field path is used by forms, imports, 
 **Lenses** are a functional programming idea for focusing on part of a larger structure. In TypeScript, they give shared paths a name and move fragile object-copying code behind a testable interface. A previous article on [type-safe error handling](/writing/type-safe-error-handling) argued that absence and failure deserve representation in the type system. Lenses extend the same idea to data access paths.
 
 <Annotation>
-**[Try it in StackBlitz →](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses)** The companion code implements typed lenses, runtime-configured lenses, a token-driven formula engine, and lens-law property tests. You can step through the modules, run the tests, and modify the examples to see how the type system and the runtime checks respond.
+**[Try it in StackBlitz →](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses)** The companion code implements typed lenses, runtime-configured lenses, lens-law property tests, and a small example of how a caller consumes tokens. You can step through the modules, run the tests, and modify the examples to see how the type system and the runtime checks respond.
 </Annotation>
-
-The article uses the companion code's `Result` shape throughout so the examples keep the same failure model as the runnable project.
 
 ## The Problem
 
@@ -126,13 +124,13 @@ const floatingRateLens = composeLens(floatingLegLens, rateLens);
 The composed `set` does three things: view the intermediate value, update it through the inner lens, then write the updated intermediate value back through the outer lens. If either step fails, the failure is propagated as `Err` instead of being thrown. The caller does not need to remember how many levels of object spread are required.
 
 ```typescript
-const currentRate = floatingRateLens.view(irs);
-if (isOk(currentRate)) {
-  const updatedIrs = floatingRateLens.set(irs, {
-    type: "Floating",
-    index: "SOFR",
-    spread: 0.004,
-  });
+const updatedIrs = floatingRateLens.set(irs, {
+  type: "Floating",
+  index: "SOFR",
+  spread: 0.004,
+});
+if (isErr(updatedIrs)) {
+  // handle the failure
 }
 ```
 
@@ -216,29 +214,15 @@ A production version needs to answer several questions explicitly:
 - Who validates that `targetType` matches the actual runtime value?
 - Are generated lenses cached, or rebuilt on every call?
 
-The companion implementation returns a [`Result`](/writing/type-safe-error-handling)-shaped value instead of pretending every path lookup succeeds:
-
-```typescript
-type ViewResult<A> = Result<A, string>;
-type SetResult<S> = Result<S, string>;
-
-interface Lens<S, A> {
-  readonly view: (source: S) => ViewResult<A>;
-  readonly set: (source: S, newValue: A) => SetResult<S>;
-}
-```
-
-`ViewResult<A>` and `SetResult<S>` use the same `_tag: "Ok" | "Err"` discriminant as the shared `Result` type. A production version would extend each error with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
+The companion implementation keeps the same `Lens<S, A>` shape introduced earlier: `view` returns `ViewResult<A>`, `set` returns `SetResult<S>`, and configuration errors surface as `Err` from `createLensFromConfig`. A production version would extend each error with the configured path, the offending segment, and the source type.
 
 ## Stable Names for Moving Paths
-
-A formula, report, import mapping, or configurable form should not need to know where a value lives inside an `IRS` object.
 
 ```text
 PresentValue = DiscountFactor * IRS.Notional
 ```
 
-`IRS.Notional` is a token: a stable name for a business concept. The token can remain stable even if the object path changes.
+A formula referencing `IRS.Notional` does not need to change when the underlying path moves. Only the configuration changes:
 
 ```typescript
 const notionalConfig: LensConfig = {
@@ -248,7 +232,7 @@ const notionalConfig: LensConfig = {
 };
 ```
 
-If the schema later moves notional under `trade.economics.notional.amount`, the formula should not change. The token mapping changes:
+After a schema migration that moves notional under `trade.economics.notional.amount`, only the mapping changes:
 
 ```typescript
 const notionalConfigV2: LensConfig = {
