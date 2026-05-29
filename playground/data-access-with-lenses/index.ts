@@ -1,5 +1,5 @@
 import { enableMapSet } from "immer";
-import { isErr, isOk } from "result-option-types";
+import { err, isErr, isOk, ok } from "result-option-types";
 import {
   type IRS,
   type EuropeanCallOption,
@@ -13,7 +13,6 @@ import {
   registerLensConfig,
   registerFormulaDefinition,
   type FormulaDefinition,
-  type FormulaResultOutput,
   type FormulaInputValue,
 } from "./formula-engine";
 
@@ -69,7 +68,7 @@ registerLensConfig("IRS.FixedLeg.RateValue", {
 const calculateAdjustedNotionalDef: FormulaDefinition = {
   id: "CalculateAdjustedNotional",
   getRequiredTokens: () => ["IRS.Notional", "IRS.FloatingLeg.Spread"],
-  execute: (inputs: Record<string, FormulaInputValue>): FormulaResultOutput => {
+  execute: (inputs: Record<string, FormulaInputValue>) => {
     console.log("Executing CalculateAdjustedNotional with inputs:", inputs);
     const notional = inputs["IRS.Notional"];
     const spread = inputs["IRS.FloatingLeg.Spread"];
@@ -79,9 +78,9 @@ const calculateAdjustedNotionalDef: FormulaDefinition = {
         "Error: Invalid input types for CalculateAdjustedNotional.",
         { notional, spread }
       );
-      return "Error: Invalid input types. Notional or Spread is not a number.";
+      return err("Invalid input types. Notional or Spread is not a number.");
     }
-    return notional * (1 + spread);
+    return ok(notional * (1 + spread));
   },
 };
 registerFormulaDefinition(calculateAdjustedNotionalDef);
@@ -93,9 +92,11 @@ const displayLegTypesAndNotionalDef: FormulaDefinition = {
     "IRS.FixedLeg.RateValue",
     "IRS.Notional",
   ],
-  execute: (inputs: Record<string, FormulaInputValue>): FormulaResultOutput => {
+  execute: (inputs: Record<string, FormulaInputValue>) => {
     console.log("Executing DisplayLegTypesAndNotional with inputs:", inputs);
-    return `Notional: ${inputs["IRS.Notional"]}, Floating Leg Rate Type: ${inputs["IRS.FloatingLeg.RateType"]}, Fixed Leg Rate Value: ${inputs["IRS.FixedLeg.RateValue"]}`;
+    return ok(
+      `Notional: ${inputs["IRS.Notional"]}, Floating Leg Rate Type: ${inputs["IRS.FloatingLeg.RateType"]}, Fixed Leg Rate Value: ${inputs["IRS.FixedLeg.RateValue"]}`
+    );
   },
 };
 registerFormulaDefinition(displayLegTypesAndNotionalDef);

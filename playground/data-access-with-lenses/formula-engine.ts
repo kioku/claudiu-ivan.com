@@ -1,10 +1,4 @@
-import {
-  type Result,
-  ok,
-  err,
-  isErr,
-  captureException,
-} from "result-option-types";
+import { type Result, ok, err, isErr } from "result-option-types";
 import { createLensFromConfig, type LensConfig } from "./lens-configurable";
 
 export type FormulaInputValue =
@@ -20,7 +14,9 @@ export type FormulaResultOutput = FormulaInputValue;
 export interface FormulaDefinition {
   id: string;
   getRequiredTokens: () => string[];
-  execute: (inputs: Record<string, FormulaInputValue>) => FormulaResultOutput;
+  execute: (
+    inputs: Record<string, FormulaInputValue>
+  ) => Result<FormulaResultOutput, string>;
 }
 
 /**
@@ -42,9 +38,9 @@ export type FormulaError =
       readonly reason: string;
     }
   | {
-      readonly kind: "ExecutionThrew";
+      readonly kind: "ExecutionFailed";
       readonly formulaId: string;
-      readonly message: string;
+      readonly reason: string;
     };
 
 // Mock storage for formula engine dependencies.
@@ -135,20 +131,10 @@ function resolveFormulaInputs(
   );
 }
 
-const executionError = (
-  formulaId: string,
-  error: Error
-): FormulaError => ({
-  kind: "ExecutionThrew",
-  formulaId,
-  message: error.message,
-});
-
 /**
  * Resolve a formula's token inputs through configured lenses and run its
- * execute function. Returns Err with a typed FormulaError instead of
- * throwing; formula-author bugs inside execute are captured and reported
- * as ExecutionThrew.
+ * execute function. Formula execution returns Result instead of throwing;
+ * the engine maps formula failures into typed FormulaError values.
  */
 export function evaluateFormula(
   formulaId: string,
@@ -167,10 +153,14 @@ export function evaluateFormula(
     return inputsResult;
   }
 
-  const result = captureException(() => formula.execute(inputsResult.value));
-  if (isErr(result)) {
-    return err(executionError(formulaId, result.error));
+  const executionResult = formula.execute(inputsResult.value);
+  if (isErr(executionResult)) {
+    return err({
+      kind: "ExecutionFailed",
+      formulaId,
+      reason: executionResult.error,
+    });
   }
 
-  return result;
+  return ok(executionResult.value);
 }

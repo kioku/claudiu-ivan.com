@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { isErr, isOk } from "result-option-types";
+import { err, isErr, isOk, ok } from "result-option-types";
 import {
   clearRegistries,
   evaluateFormula,
@@ -7,7 +7,6 @@ import {
   registerFormulaDefinition,
   type FormulaDefinition,
   type FormulaInputValue,
-  type FormulaResultOutput,
 } from "./formula-engine";
 import { type LensConfig } from "./lens-configurable";
 import { type IRS, type FixedRate, type FloatingRate } from "./data-models";
@@ -52,16 +51,14 @@ describe("Formula Engine", () => {
     const adjustedNotionalFormula: FormulaDefinition = {
       id: "AdjustedNotional",
       getRequiredTokens: () => ["notional", "spread"],
-      execute: (
-        inputs: Record<string, FormulaInputValue>
-      ): FormulaResultOutput => {
+      execute: (inputs: Record<string, FormulaInputValue>) => {
         if (
           typeof inputs.notional !== "number" ||
           typeof inputs.spread !== "number"
         ) {
-          throw new Error("Invalid input types for AdjustedNotional");
+          return err("Invalid input types for AdjustedNotional");
         }
-        return inputs.notional * (1 + inputs.spread);
+        return ok(inputs.notional * (1 + inputs.spread));
       },
     };
 
@@ -93,7 +90,7 @@ describe("Formula Engine", () => {
     const missingTokenFormula: FormulaDefinition = {
       id: "MissingTokenFormula",
       getRequiredTokens: () => ["tokenExists", "tokenMissing"],
-      execute: () => 0,
+      execute: () => ok(0),
     };
     registerLensConfig("tokenExists", notionalConfig);
     registerFormulaDefinition(missingTokenFormula);
@@ -113,7 +110,7 @@ describe("Formula Engine", () => {
     const invalidConfigFormula: FormulaDefinition = {
       id: "InvalidConfigFormula",
       getRequiredTokens: () => ["invalidToken"],
-      execute: () => 0,
+      execute: () => ok(0),
     };
     registerLensConfig("invalidToken", {
       sourceType: "IRS",
@@ -138,7 +135,7 @@ describe("Formula Engine", () => {
     const viewFailFormula: FormulaDefinition = {
       id: "ViewFailFormula",
       getRequiredTokens: () => ["badPathToken"],
-      execute: () => 0,
+      execute: () => ok(0),
     };
     registerLensConfig("badPathToken", nonExistentConfig);
     registerFormulaDefinition(viewFailFormula);
@@ -158,13 +155,11 @@ describe("Formula Engine", () => {
     }
   });
 
-  it("returns ExecutionThrew when formula execution throws", () => {
+  it("returns ExecutionFailed when formula execution returns Err", () => {
     const errorFormula: FormulaDefinition = {
       id: "ErrorFormula",
       getRequiredTokens: () => ["val1"],
-      execute: (): FormulaResultOutput => {
-        throw new Error("Execution failed intentionally");
-      },
+      execute: () => err("Execution failed intentionally"),
     };
     registerLensConfig("val1", notionalConfig);
     registerFormulaDefinition(errorFormula);
@@ -174,9 +169,9 @@ describe("Formula Engine", () => {
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       expect(result.error).toEqual({
-        kind: "ExecutionThrew",
+        kind: "ExecutionFailed",
         formulaId: "ErrorFormula",
-        message: "Execution failed intentionally",
+        reason: "Execution failed intentionally",
       });
     }
   });

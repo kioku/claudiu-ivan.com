@@ -28,12 +28,6 @@ export function tryCatch<T>(fn: () => T): Result<T, Error> {
 }
 
 /**
- * Alias for tryCatch with a name that reads better at call sites that
- * deliberately capture exceptions at a boundary.
- */
-export const captureException = tryCatch;
-
-/**
  * Asynchronous version of tryCatch for async functions.
  * Returns a Promise of Result<T, Error>.
  */

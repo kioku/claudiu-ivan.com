@@ -38,7 +38,6 @@ export {
 export {
   fromNullable,
   tryCatch,
-  captureException,
   tryCatchAsync,
   optionToResult,
   optionToResultLazy,
