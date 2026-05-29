@@ -1,7 +1,6 @@
-import { type Lens, type ViewResult } from "./lens-core";
-import { type LensConfig, createLensFromConfig } from "./lens-configurable";
+import { type Result, ok, err, isErr } from "result-option-types";
+import { createLensFromConfig, type LensConfig } from "./lens-configurable";
 
-// --- Supporting Types for Formula Engine ---
 export type FormulaInputValue =
   | number
   | string
@@ -12,18 +11,38 @@ export type FormulaInputValue =
 
 export type FormulaResultOutput = FormulaInputValue;
 
-export type FormulaEvaluationResult =
-  | { readonly kind: "success"; readonly value: FormulaResultOutput }
-  | { readonly kind: "failure"; readonly error: string };
-
 export interface FormulaDefinition {
   id: string;
   getRequiredTokens: () => string[];
   execute: (inputs: Record<string, FormulaInputValue>) => FormulaResultOutput;
 }
 
-// Mock storage for formula engine dependencies
-// In a real app, these would come from a database, config files, or a service.
+/**
+ * Typed error union for the formula engine. Each variant carries the
+ * context a caller (or an operator inspecting logs) needs to act on the
+ * failure without rediscovering it from the message text.
+ */
+export type FormulaError =
+  | { readonly kind: "MissingFormulaDefinition"; readonly formulaId: string }
+  | { readonly kind: "MissingLensConfig"; readonly token: string }
+  | {
+      readonly kind: "InvalidLensConfig";
+      readonly token: string;
+      readonly reason: string;
+    }
+  | {
+      readonly kind: "ResolutionFailed";
+      readonly token: string;
+      readonly reason: string;
+    }
+  | {
+      readonly kind: "ExecutionThrew";
+      readonly formulaId: string;
+      readonly message: string;
+    };
+
+// Mock storage for formula engine dependencies.
+// In a real app these would come from a database, config files, or a service.
 const LENS_CONFIGS_REGISTRY: Record<string, LensConfig> = {};
 const FORMULA_DEFINITIONS_REGISTRY: Record<string, FormulaDefinition> = {};
 
@@ -44,65 +63,69 @@ export function lookupFormulaDefinition(
 ): FormulaDefinition | undefined {
   return FORMULA_DEFINITIONS_REGISTRY[id];
 }
-// --- Simplified Conceptual Flow of a Formula Engine using Lenses ---
+
+/**
+ * Test/utility helper to reset the registries. Production code uses the
+ * register* functions; this keeps the mock storage isolated between
+ * test runs.
+ */
+export function clearRegistries(): void {
+  for (const key of Object.keys(LENS_CONFIGS_REGISTRY)) {
+    delete LENS_CONFIGS_REGISTRY[key];
+  }
+  for (const key of Object.keys(FORMULA_DEFINITIONS_REGISTRY)) {
+    delete FORMULA_DEFINITIONS_REGISTRY[key];
+  }
+}
+
+/**
+ * Resolve a formula's token inputs through configured lenses and run its
+ * execute function. Returns Err with a typed FormulaError instead of
+ * throwing; the only throw the engine cannot fully avoid is a
+ * formula-author bug inside execute, which is captured and reported as
+ * ExecutionThrew.
+ */
 export function evaluateFormula(
   formulaId: string,
-  dataContext: object // Should ideally be S, but generic context is hard here
-): FormulaEvaluationResult {
-  const formulaDefinition = lookupFormulaDefinition(formulaId);
-  if (!formulaDefinition) {
-    return {
-      kind: "failure",
-      error: `Formula definition not found for ID: ${formulaId}`,
-    };
+  dataContext: object
+): Result<FormulaResultOutput, FormulaError> {
+  const formula = lookupFormulaDefinition(formulaId);
+  if (!formula) {
+    return err({ kind: "MissingFormulaDefinition", formulaId });
   }
 
-  const requiredTokens = formulaDefinition.getRequiredTokens();
-  const inputValues: Record<string, FormulaInputValue> = {};
-  const lensCache = new Map<string, Lens<object, FormulaInputValue>>(); // In-function cache
+  const inputs: Record<string, FormulaInputValue> = {};
 
-  for (const token of requiredTokens) {
-    const lensConfig = lookupLensConfig(token);
-    if (!lensConfig) {
-      return {
-        kind: "failure",
-        error: `Configuration missing for token: ${token}`,
-      };
+  for (const token of formula.getRequiredTokens()) {
+    const config = lookupLensConfig(token);
+    if (!config) {
+      return err({ kind: "MissingLensConfig", token });
     }
 
-    let lens: Lens<object, FormulaInputValue>; // Using 'any' due to dataContext variability
-    const cacheKey = JSON.stringify(lensConfig);
-
-    if (lensCache.has(cacheKey)) {
-      lens = lensCache.get(cacheKey)!;
-    } else {
-      // Type S for createLensFromConfig is effectively 'any' here because dataContext is 'object'
-      // Type A for createLensFromConfig is also 'any' as we don't know the target type from config alone
-      lens = createLensFromConfig(lensConfig);
-      lensCache.set(cacheKey, lens);
+    const lensResult = createLensFromConfig<object, FormulaInputValue>(config);
+    if (isErr(lensResult)) {
+      return err({
+        kind: "InvalidLensConfig",
+        token,
+        reason: lensResult.error,
+      });
     }
 
-    const viewResult: ViewResult<FormulaInputValue> = lens.view(dataContext);
-
-    if (!viewResult.success) {
-      return {
-        kind: "failure",
-        error: `Failed to retrieve value for token '${token}' (path: ${lensConfig.getterPath.join(
-          "."
-        )}). Reason: ${viewResult.error}`,
-      };
+    const viewResult = lensResult.value.view(dataContext);
+    if (isErr(viewResult)) {
+      return err({
+        kind: "ResolutionFailed",
+        token,
+        reason: viewResult.error,
+      });
     }
-    inputValues[token] = viewResult.value;
+    inputs[token] = viewResult.value;
   }
 
   try {
-    const result = formulaDefinition.execute(inputValues);
-    return { kind: "success", value: result };
+    return ok(formula.execute(inputs));
   } catch (e: unknown) {
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    return {
-      kind: "failure",
-      error: `Error executing formula '${formulaId}': ${errorMessage}`,
-    };
+    const message = e instanceof Error ? e.message : String(e);
+    return err({ kind: "ExecutionThrew", formulaId, message });
   }
 }
