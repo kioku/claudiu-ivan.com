@@ -228,50 +228,46 @@ interface Lens<S, A> {
 }
 ```
 
-`ViewResult<A>` and `SetResult<S>` use the same `_tag: "Ok" | "Err"` discriminant as the shared `Result` type. The formula engine in the next section uses a discriminated union of failure modes instead of a bare string; a production version would extend each variant with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
+`ViewResult<A>` and `SetResult<S>` use the same `_tag: "Ok" | "Err"` discriminant as the shared `Result` type. A production version would extend each error with the configured path, the offending segment, and the source type. The pure lens definition is shorter, but the runtime version adds an error channel so callers cannot accidentally ignore a missing or mistyped path.
 
-Once `view` and `set` return `Result`, a configuration-driven formula engine becomes a reasonable thing to build on top.
+## Stable Names for Moving Paths
 
-## A Token-Driven Formula Engine
-
-Valuation engines often refer to domain concepts rather than object paths:
+A formula, report, import mapping, or configurable form should not need to know where a value lives inside an `IRS` object.
 
 ```text
 PresentValue = DiscountFactor * IRS.Notional
 ```
 
-The formula should not care whether the notional lives at `notionalAmount`, `trade.economics.notional.amount`, or in a client-specific import shape. It should refer to the concept while the mapping layer handles the location.
-
-The formula engine resolves each token through a configured lens, then [`evaluateFormula`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts#L139) passes the resolved inputs to the formula's `execute`:
+`IRS.Notional` is a token: a stable name for a business concept. The token can remain stable even if the object path changes.
 
 ```typescript
-type FormulaResultOutput = number | string | boolean | object | null | undefined;
-
-interface FormulaDefinition {
-  readonly getRequiredTokens: () => string[];
-  readonly execute: (
-    inputs: Record<string, FormulaResultOutput>
-  ) => Result<FormulaResultOutput, string>;
-}
-
-type FormulaError =
-  | { readonly kind: "MissingFormulaDefinition"; readonly formulaId: string }
-  | { readonly kind: "MissingLensConfig"; readonly token: string }
-  | { readonly kind: "InvalidLensConfig"; readonly token: string; readonly reason: string }
-  | { readonly kind: "ResolutionFailed"; readonly token: string; readonly reason: string }
-  | { readonly kind: "ExecutionFailed"; readonly formulaId: string; readonly reason: string };
-
-function evaluateFormula(
-  formulaId: string,
-  dataContext: object
-): Result<FormulaResultOutput, FormulaError>;
+const notionalConfig: LensConfig = {
+  sourceType: "IRS",
+  targetType: "number",
+  getterPath: ["notionalAmount"],
+};
 ```
 
-The engine converts lookup, configuration, path-resolution, and formula execution failures into `Err`. Formula code returns `Result` directly; the example project does not need `try/catch`, and its formula definitions do not throw. Callers branch on the `Ok`/`Err` discriminant with `isOk` or `isErr`, and TypeScript flags any missed error case once they switch on `error.kind`.
+If the schema later moves notional under `trade.economics.notional.amount`, the formula should not change. The token mapping changes:
 
-Formulas hold the business logic, lens configuration locates the data, and validation detects bad mappings. Bad configuration can still corrupt results, which is why the runtime boundary needs aggressive validation, mapping tests, and a typed error channel rather than thrown exceptions.
+```typescript
+const notionalConfigV2: LensConfig = {
+  sourceType: "IRS",
+  targetType: "number",
+  getterPath: ["trade", "economics", "notional", "amount"],
+};
+```
 
-That separation also opens a question the typed version never had to answer: who owns the tokens, and what happens when their underlying paths change?
+A configured lens is the mechanism that resolves the token against a runtime object. That boundary can fail in several ways:
+
+- no configuration exists for the token,
+- the configuration is malformed,
+- the configured path does not exist on the current object,
+- the resolved value has the wrong runtime type.
+
+Configurable systems should treat these as expected failure modes: return `Err`, log the token and path, and validate the mapping against fixtures before deployment.
+
+The [companion formula example](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts) is intentionally small: formulas ask for tokens, lenses resolve those tokens, and callers receive typed success or failure.
 
 ## Mapping Configuration as a Contract
 
