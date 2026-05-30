@@ -1,0 +1,12 @@
+{
+  "name": "playground",
+  "private": true,
+  "workspaces": [
+    "data-access-with-lenses",
+    "result-option-types"
+  ],
+  "scripts": {
+    "start": "npm --workspace data-access-with-lenses start",
+    "test": "npm --workspace data-access-with-lenses test"
+  }
+}

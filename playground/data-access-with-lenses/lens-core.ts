@@ -1,4 +1,4 @@
-import { type Result, ok, err, isErr } from "result-option-types";
+import { type Result, ok, err, isErr } from "../result-option-types/index.ts";
 
 /**
  * The result of a Lens view operation. Aliased to make lens signatures

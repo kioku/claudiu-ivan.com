@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { ok, isOk, isErr } from "result-option-types";
+import { ok, isOk, isErr } from "../result-option-types/index.ts";
 import { createLensFromConfig, type LensConfig } from "./lens-configurable";
 import type { Lens } from "./lens-core";
 

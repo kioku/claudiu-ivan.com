@@ -1,4 +1,4 @@
-import { type Result, ok, err, isErr } from "result-option-types";
+import { type Result, ok, err, isErr } from "../result-option-types/index.ts";
 import { createLensFromConfig, type LensConfig } from "./lens-configurable";
 
 export type FormulaInputValue =

@@ -1,4 +1,4 @@
-import { type Result, ok, err, isErr } from "result-option-types";
+import { type Result, ok, err, isErr } from "../result-option-types/index.ts";
 import { type Lens, type ViewResult, type SetResult } from "./lens-core";
 
 export interface LensConfig {

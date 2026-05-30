@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { ok, err, isOk, isErr } from "result-option-types";
+import { ok, err, isOk, isErr } from "../result-option-types/index.ts";
 import { lensProp, composeLens } from "./lens-core";
 
 describe("lensProp", () => {

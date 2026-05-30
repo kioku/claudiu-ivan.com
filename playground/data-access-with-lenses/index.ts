@@ -1,5 +1,5 @@
 import { enableMapSet } from "immer";
-import { err, isErr, isOk, ok } from "result-option-types";
+import { err, isErr, isOk, ok } from "../result-option-types/index.ts";
 import {
   type IRS,
   type EuropeanCallOption,

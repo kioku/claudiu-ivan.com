@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { err, isErr, isOk, ok } from "result-option-types";
+import { err, isErr, isOk, ok } from "../result-option-types/index.ts";
 import {
   clearRegistries,
   evaluateFormula,
