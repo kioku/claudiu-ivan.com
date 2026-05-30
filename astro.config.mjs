@@ -11,7 +11,9 @@ export default defineConfig({
       remarkPlugins: [remarkMath],
       rehypePlugins: [rehypeKatex],
     }),
-    sitemap(),
+    sitemap({
+      filter: (page) => !page.includes("/writing/data-access-with-lenses/"),
+    }),
     tailwind(),
   ],
 });
