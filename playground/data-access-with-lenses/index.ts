@@ -200,7 +200,7 @@ function runConfigurableLensDemo(): void {
 }
 
 function runMismatchedPathDemo(): void {
-  section("Testing Lens on Potentially Mismatched Path (fixedLeg.rate.spread)");
+  section("Mismatched Path Example: fixedLeg.rate.spread");
 
   const problematicPathConfig: LensConfig = {
     sourceType: "IRS",
@@ -217,13 +217,15 @@ function runMismatchedPathDemo(): void {
 
   const problematicLens = problematicLensResult.value;
   const problematicView = problematicLens.view(sampleIRS);
-  console.log(
-    "View result for fixedLeg.rate.spread (expected failure):",
-    problematicView
-  ); // Expect Err because the leaf property is absent.
+  if (isErr(problematicView)) {
+    console.log("View failed because FixedRate has no spread field:");
+    console.log(problematicView.error);
+  } else {
+    console.log("Unexpected view success:", problematicView.value);
+  }
 
   console.log(
-    "Attempting to set on fixedLeg.rate.spread (expected to modify object if parent path exists)..."
+    "Set succeeds because this demo lens allows creating the leaf property when the parent path exists."
   );
   const problematicSetResult = problematicLens.set(sampleIRS, 0.007);
   if (isErr(problematicSetResult)) {
@@ -234,11 +236,9 @@ function runMismatchedPathDemo(): void {
     return;
   }
 
-  // Leaf creation is allowed when the parent path exists, so this adds
-  // 'spread' to the FixedRate object instead of failing.
+  console.log("Updated fixedLeg.rate:", problematicSetResult.value.fixedLeg.rate);
   console.log(
-    "Result of setting 'spread' on FixedRate:",
-    problematicSetResult.value.fixedLeg.rate
+    "This is why production configurable lenses should validate target paths against fixtures."
   );
 }
 
