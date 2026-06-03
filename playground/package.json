@@ -1,12 +1,17 @@
 {
   "name": "playground",
   "private": true,
-  "workspaces": [
-    "data-access-with-lenses",
-    "result-option-types"
-  ],
+  "type": "module",
   "scripts": {
-    "start": "npm --workspace data-access-with-lenses start",
-    "test": "npm --workspace data-access-with-lenses test"
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "immer": "^10.0.1"
+  },
+  "devDependencies": {
+    "fast-check": "^4.1.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.1.4"
   }
 }
