@@ -76,13 +76,7 @@ function updateSpreadManually(irs: IRS, newSpread: number): IRS {
 
 For one update, this is probably fine. The problem starts when this pattern appears fifty times, each copy slightly different, each one depending on the developer remembering the exact shape of the object.
 
-The failures tend to be mundane:
-
-- copy the top level but mutate a nested object,
-- forget one level of copying,
-- handle one branch of a discriminated union but not another,
-- repeat path knowledge across several callers,
-- make a schema change and miss one of the hand-written update paths.
+The failures tend to be mundane: a copied top level with a mutated nested object, a missing spread at one level, or a schema change that misses one hand-written update path. Discriminated unions add another source of drift because each update has to remember which branch it is handling.
 
 A codebase should not rely on "be careful" as its enforcement mechanism. If a path through a domain object matters, it deserves a name.
 
@@ -173,7 +167,7 @@ So far every focused path is chosen at compile time. Real systems often need pat
 
 ## Runtime-Configured Lenses
 
-Enterprise systems often have formula engines, configurable forms, import mappings, or client-specific data models. Hard-coding every path in application logic does not scale across products and clients. One common fix is to introduce **tokens**: stable names for domain concepts such as `IRS.Notional`, `Option.Strike`, or `Policy.Premium`. Formulas reference the token; configuration maps each token to a concrete path on the current data structure. A lens walks that path.
+Runtime configuration is useful when a path has to cross a system boundary. Formula engines are the clearest example: formulas should depend on stable tokens such as `IRS.Notional`, not on the current object shape. Configuration maps each token to a concrete path, and a lens walks that path.
 
 A minimal configuration needs source and target types plus a path:
 
@@ -205,14 +199,7 @@ Generated lenses lose some of the guarantees that made the hand-written version 
 
 Configuration-driven access can still be the right design, but the inputs have to be treated as untrusted.
 
-A production version needs to answer several questions explicitly:
-
-- What happens when a path is missing?
-- Does `view` return a typed result, or does it fail another way?
-- Can `set` create intermediate objects, or must the full path already exist?
-- How are discriminated unions handled?
-- Who validates that `targetType` matches the actual runtime value?
-- Are generated lenses cached, or rebuilt on every call?
+A production version needs clear behavior when a path is missing, when a runtime value does not match `targetType`, and when a discriminated union is reached through configuration. It also needs to decide whether `set` can create missing structure or only update paths that already exist.
 
 The companion implementation keeps the same `Lens<S, A>` shape introduced earlier. `view` returns `ViewResult<A>`, `set` returns `SetResult<S>`, and configuration errors surface as `Err` from `createLensFromConfig`. A production version would include enough context to identify which mapping failed and where traversal stopped.
 
@@ -261,14 +248,7 @@ Token mappings should have a clear owner because they are part of the public con
 
 During a schema migration, `IRS.Notional` might move from `notionalAmount` to `trade.economics.notional.amount`. Formulas keep referencing `IRS.Notional`; only the mapping changes. A validation job should load representative v2 fixtures and resolve the token. It should fail the deployment if the old path is still configured or the result is not a number. Without that check, the abstraction has only moved a property access bug into configuration.
 
-A production setup should make a few things explicit:
-
-- which team owns each token namespace,
-- which domain schema version each path targets,
-- which fixtures prove the mapping still works,
-- whether failures are deploy-time errors or request-time errors,
-- what context appears in an error when lookup fails,
-- how old token mappings are retired.
+A production setup should make ownership and compatibility explicit. Each token namespace needs an owner, each mapping should target a known schema version, and representative fixtures should prove that the configured path still resolves. The team also has to decide whether failures block deployment or surface at request time.
 
 The error context matters. `Could not resolve IRS.Notional` is better than `Cannot read property amount of undefined`, but it still may not be enough. A better failure should say which token failed, which path was configured, and what type was expected.
 
@@ -301,9 +281,6 @@ A senior reviewer will object less to the unfamiliar pattern than to hidden fail
 ## References
 
 - [Companion code: data-access-with-lenses](https://github.com/kioku/claudiu-ivan.com/tree/main/playground/data-access-with-lenses)
-- [Monocle-TS Documentation](https://gcanti.github.io/monocle-ts/)
-- [Ramda lensPath](https://ramdajs.com/docs/#lensPath)
-- [Immer Documentation](https://immerjs.github.io/immer/)
-- [Professor Frisby's Mostly Adequate Guide to Functional Programming](https://mostly-adequate.gitbook.io/mostly-adequate-guide/)
-- [A Taste of Practical Optics](https://medium.com/@gcanti/a-taste-of-practical-optics-a770d135d589)
+- [Combinators for Bi-Directional Tree Transformations: A Linguistic Approach to the View-Update Problem](https://www.cis.upenn.edu/~bcpierce/papers/lenses-toplas-final.pdf) by Foster, Greenwald, Moore, Pierce, and Schmitt
+- [Profunctor Optics: Modular Data Accessors](https://arxiv.org/abs/1703.10857) by Pickering, Gibbons, and Wu
 - [Domain-Specific Languages](https://martinfowler.com/books/dsl.html) by Martin Fowler
