@@ -16,6 +16,10 @@ import {
   type FormulaInputValue,
 } from "./formula-engine";
 
+const section = (title: string): void => {
+  console.log(`\n--- ${title} ---`);
+};
+
 enableMapSet();
 
 // --- Example Data Setup ---
@@ -101,82 +105,54 @@ const displayLegTypesAndNotionalDef: FormulaDefinition = {
 };
 registerFormulaDefinition(displayLegTypesAndNotionalDef);
 
-// --- Main Execution Block for Demonstration ---
-function runDemonstrations() {
-  console.log("--- Running Demonstrations ---");
+function runLensLawDemo(): void {
+  section("Lens Law Example (Option Strike)");
 
-  // Lens Law Demo (simplified, more robust tests in .test.ts files)
-  console.log("\n--- Lens Law Example (Option Strike) ---");
   const optionStrikeLens = lensProp<EuropeanCallOption, "strike">("strike");
   const strikeView = optionStrikeLens.view(option1);
-  if (isOk(strikeView)) {
-    const updatedOptionResult = optionStrikeLens.set(
-      option1,
-      strikeView.value + 10
-    );
-    if (isErr(updatedOptionResult)) {
-      console.error("Failed to set strike on option1:", updatedOptionResult.error);
-      return;
-    }
-
-    const updatedOption = updatedOptionResult.value;
-    const newStrikeView = optionStrikeLens.view(updatedOption);
-    console.log("Original Strike:", strikeView.value);
-    if (isOk(newStrikeView)) {
-      console.log("Updated Strike:", newStrikeView.value);
-      console.log(
-        "Set-Get Law (simplified):",
-        newStrikeView.value === strikeView.value + 10
-      );
-    } else {
-      console.error(
-        "Failed to view strike on updated option:",
-        newStrikeView.error
-      );
-    }
-  } else {
+  if (isErr(strikeView)) {
     console.error("Failed to view strike on option1:", strikeView.error);
+    return;
   }
 
+  const updatedOptionResult = optionStrikeLens.set(
+    option1,
+    strikeView.value + 10
+  );
+  if (isErr(updatedOptionResult)) {
+    console.error("Failed to set strike on option1:", updatedOptionResult.error);
+    return;
+  }
+
+  const newStrikeView = optionStrikeLens.view(updatedOptionResult.value);
+  if (isErr(newStrikeView)) {
+    console.error("Failed to view strike on updated option:", newStrikeView.error);
+    return;
+  }
+
+  console.log("Original Strike:", strikeView.value);
+  console.log("Updated Strike:", newStrikeView.value);
   console.log(
-    "\n--- Formula Evaluation Example: CalculateAdjustedNotional ---"
+    "Set-Get Law (simplified):",
+    newStrikeView.value === strikeView.value + 10
   );
-  const formulaResult1 = evaluateFormula(
-    "CalculateAdjustedNotional",
-    sampleIRS
-  );
-  if (isOk(formulaResult1)) {
-    console.log(
-      "Formula Result (CalculateAdjustedNotional):",
-      formulaResult1.value
-    );
-  } else {
-    console.error(
-      "Error evaluating CalculateAdjustedNotional:",
-      formulaResult1.error
-    );
+}
+
+function runFormulaExample(formulaId: string): void {
+  section(`Formula Evaluation Example: ${formulaId}`);
+
+  const formulaResult = evaluateFormula(formulaId, sampleIRS);
+  if (isOk(formulaResult)) {
+    console.log(`Formula Result (${formulaId}):`, formulaResult.value);
+    return;
   }
 
-  console.log(
-    "\n--- Formula Evaluation Example: DisplayLegTypesAndNotional ---"
-  );
-  const formulaResult2 = evaluateFormula(
-    "DisplayLegTypesAndNotional",
-    sampleIRS
-  );
-  if (isOk(formulaResult2)) {
-    console.log(
-      "Formula Result (DisplayLegTypesAndNotional):",
-      formulaResult2.value
-    );
-  } else {
-    console.error(
-      "Error evaluating DisplayLegTypesAndNotional:",
-      formulaResult2.error
-    );
-  }
+  console.error(`Error evaluating ${formulaId}:`, formulaResult.error);
+}
 
-  console.log("\n--- Direct Configurable Lens Usage Example ---");
+function runConfigurableLensDemo(): void {
+  section("Direct Configurable Lens Usage Example");
+
   const spreadLensConfig: LensConfig = {
     sourceType: "IRS",
     targetType: "number",
@@ -192,41 +168,40 @@ function runDemonstrations() {
   const spreadViewResult = spreadLens.view(sampleIRS);
   console.log("Spread viewed via lens:", spreadViewResult);
 
-  if (isOk(spreadViewResult)) {
-    const newIRSResult = spreadLens.set(
-      sampleIRS,
-      spreadViewResult.value + 0.001
-    );
-    if (isErr(newIRSResult)) {
-      console.error("Failed to update spread in IRS object:", newIRSResult.error);
-      return;
-    }
-
-    const newIRS = newIRSResult.value;
-    const updatedSpreadView = spreadLens.view(newIRS);
-    console.log("Updated spread in new IRS object:", updatedSpreadView);
-    if (sampleIRS.floatingLeg.rate.type === "Floating") {
-      console.log(
-        "Original IRS spread (direct access):",
-        sampleIRS.floatingLeg.rate.spread
-      );
-    }
-    if (
-      newIRS.floatingLeg.rate.type === "Floating" &&
-      isOk(updatedSpreadView)
-    ) {
-      console.log(
-        "New IRS spread (direct access):",
-        newIRS.floatingLeg.rate.spread,
-        "Matches lens view:",
-        newIRS.floatingLeg.rate.spread === updatedSpreadView.value
-      );
-    }
+  if (isErr(spreadViewResult)) {
+    return;
   }
 
-  console.log(
-    "\n--- Testing Lens on Potentially Mismatched Path (fixedLeg.rate.spread) ---"
-  );
+  const newIRSResult = spreadLens.set(sampleIRS, spreadViewResult.value + 0.001);
+  if (isErr(newIRSResult)) {
+    console.error("Failed to update spread in IRS object:", newIRSResult.error);
+    return;
+  }
+
+  const newIRS = newIRSResult.value;
+  const updatedSpreadView = spreadLens.view(newIRS);
+  console.log("Updated spread in new IRS object:", updatedSpreadView);
+
+  if (sampleIRS.floatingLeg.rate.type === "Floating") {
+    console.log(
+      "Original IRS spread (direct access):",
+      sampleIRS.floatingLeg.rate.spread
+    );
+  }
+
+  if (newIRS.floatingLeg.rate.type === "Floating" && isOk(updatedSpreadView)) {
+    console.log(
+      "New IRS spread (direct access):",
+      newIRS.floatingLeg.rate.spread,
+      "Matches lens view:",
+      newIRS.floatingLeg.rate.spread === updatedSpreadView.value
+    );
+  }
+}
+
+function runMismatchedPathDemo(): void {
+  section("Testing Lens on Potentially Mismatched Path (fixedLeg.rate.spread)");
+
   const problematicPathConfig: LensConfig = {
     sourceType: "IRS",
     targetType: "number",
@@ -251,19 +226,29 @@ function runDemonstrations() {
     "Attempting to set on fixedLeg.rate.spread (expected to modify object if parent path exists)..."
   );
   const problematicSetResult = problematicLens.set(sampleIRS, 0.007);
-  if (isOk(problematicSetResult)) {
-    // Leaf creation is allowed when the parent path exists, so this adds
-    // 'spread' to the FixedRate object instead of failing.
-    console.log(
-      "Result of setting 'spread' on FixedRate:",
-      problematicSetResult.value.fixedLeg.rate
-    );
-  } else {
+  if (isErr(problematicSetResult)) {
     console.error(
       "Error during problematic set on fixedLeg.rate.spread:",
       problematicSetResult.error
     );
+    return;
   }
+
+  // Leaf creation is allowed when the parent path exists, so this adds
+  // 'spread' to the FixedRate object instead of failing.
+  console.log(
+    "Result of setting 'spread' on FixedRate:",
+    problematicSetResult.value.fixedLeg.rate
+  );
+}
+
+function runDemonstrations(): void {
+  console.log("--- Running Demonstrations ---");
+  runLensLawDemo();
+  runFormulaExample("CalculateAdjustedNotional");
+  runFormulaExample("DisplayLegTypesAndNotional");
+  runConfigurableLensDemo();
+  runMismatchedPathDemo();
 }
 
 runDemonstrations();
