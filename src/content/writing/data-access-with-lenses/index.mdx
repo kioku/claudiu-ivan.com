@@ -9,16 +9,16 @@ import Annotation from "@/components/Annotation.astro";
 
 Updating a field several levels into a nested immutable object means copying the path above the target and rebuilding the enclosing object by hand. If any intermediate spread is missing, the returned object shares a reference with the original at that level, and a later update will mutate both copies. The compiler does not detect this, and code review finds it inconsistently.
 
-In financial systems this shows up constantly. Instruments like swaps, options, policies, portfolios, and valuation contexts are nested several levels deep. The same is true outside finance, where claims systems, logistics tools, document workflows, entitlement models, and product catalogs all develop real shape. Once the domain gets real, the objects stop being flat.
+In financial systems this shows up constantly. Interest rate products, policy administration, and valuation contexts are nested several levels deep. The same pattern appears in claims systems, logistics tools, document workflows, entitlement models, and product catalogs. Once the domain gets real, the objects stop being flat.
 
 Immutability helps because it makes state changes predictable. But immutability has a practical cost: updating nested data can become noisy enough that the intent disappears.
 
-Path duplication is a second cost. When a field path is used by forms, imports, reports, or formulas, it stops being an implementation detail and becomes part of the contract between the domain model and the rest of the system. Repeating that contract as raw property access makes schema changes harder to review and harder to test.
+Path duplication is a second cost. When a field path is used outside the module that owns the domain model, it stops being an implementation detail and becomes part of a broader contract. Repeating that contract as raw property access makes schema changes harder to review and harder to test.
 
 **Lenses** are a functional programming idea for focusing on part of a larger structure. In TypeScript, they give shared paths a name and move fragile object-copying code behind a testable interface. A previous article on [type-safe error handling](/writing/type-safe-error-handling) argued that absence and failure deserve representation in the type system. Lenses extend the same idea to data access paths.
 
 <Annotation>
-**[Try it in StackBlitz ->](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground)** The companion code implements typed lenses, runtime-configured lenses, lens-law property tests, and a small token-consuming example. You can step through the modules, run the tests, and modify the examples to see how the type system and runtime checks respond.
+**[Try it in StackBlitz ->](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground)** The companion code includes typed lenses, runtime-configured lenses, property tests for the lens laws, and a small token-consuming example. You can step through the modules, run the tests, and modify the examples to see how the type system and runtime checks respond.
 </Annotation>
 
 ## The Problem
@@ -81,7 +81,7 @@ The failures tend to be mundane:
 - copy the top level but mutate a nested object,
 - forget one level of copying,
 - handle one branch of a discriminated union but not another,
-- duplicate path knowledge across services, forms, validators, and formula engines,
+- repeat path knowledge across several callers,
 - make a schema change and miss one of the hand-written update paths.
 
 A codebase should not rely on "be careful" as its enforcement mechanism. If a path through a domain object matters, it deserves a name.
@@ -121,7 +121,7 @@ The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-iv
 const floatingRateLens = composeLens(floatingLegLens, rateLens);
 ```
 
-The composed `set` views the intermediate value, updates it through the inner lens, then writes the updated intermediate value back through the outer lens. If either step fails, the failure is propagated as `Err` instead of being thrown. The caller does not need to remember how many levels of object spread are required.
+The composed `set` first reads the intermediate value. It then delegates the update to the inner lens and writes the updated intermediate value back through the outer lens. If either step fails, the failure is propagated as `Err` instead of being thrown. The caller does not need to remember how many levels of object spread are required.
 
 ```typescript
 const updatedIrs = floatingRateLens.set(irs, {
@@ -134,7 +134,7 @@ if (isErr(updatedIrs)) {
 }
 ```
 
-Naming the path changes the maintenance model. A named path can be reused, tested, and discussed in code review without re-reading object spread syntax. That trust is only earned if the lens behaves predictably under composition and repeated updates, which is what the lens laws describe.
+Naming the path changes the maintenance model. A named path can be tested and discussed in code review without re-reading object spread syntax. That trust is only earned if the lens behaves predictably under composition and repeated updates, which is what the lens laws describe.
 
 ## Lens Laws
 
@@ -173,7 +173,7 @@ So far every focused path is chosen at compile time. Real systems often need pat
 
 ## Runtime-Configured Lenses
 
-Enterprise systems often have formula engines, configurable forms, import mappings, or client-specific data models. Hard-coding every path in application logic does not scale across products and clients. The usual solution is to introduce **tokens**: stable names for domain concepts such as `IRS.Notional`, `Option.Strike`, or `Policy.Premium`. Formulas reference the token; configuration maps each token to a concrete path on the current data structure. A lens walks that path.
+Enterprise systems often have formula engines, configurable forms, import mappings, or client-specific data models. Hard-coding every path in application logic does not scale across products and clients. One common fix is to introduce **tokens**: stable names for domain concepts such as `IRS.Notional`, `Option.Strike`, or `Policy.Premium`. Formulas reference the token; configuration maps each token to a concrete path on the current data structure. A lens walks that path.
 
 A minimal configuration needs source and target types plus a path:
 
@@ -208,13 +208,13 @@ Configuration-driven access can still be the right design, but the inputs have t
 A production version needs to answer several questions explicitly:
 
 - What happens when a path is missing?
-- Does `view` return `undefined`, throw, or return a typed result?
+- Does `view` return a typed result, or does it fail another way?
 - Can `set` create intermediate objects, or must the full path already exist?
 - How are discriminated unions handled?
 - Who validates that `targetType` matches the actual runtime value?
 - Are generated lenses cached, or rebuilt on every call?
 
-The companion implementation keeps the same `Lens<S, A>` shape introduced earlier: `view` returns `ViewResult<A>`, `set` returns `SetResult<S>`, and configuration errors surface as `Err` from `createLensFromConfig`. A production version would include enough context to identify which mapping failed and where traversal stopped.
+The companion implementation keeps the same `Lens<S, A>` shape introduced earlier. `view` returns `ViewResult<A>`, `set` returns `SetResult<S>`, and configuration errors surface as `Err` from `createLensFromConfig`. A production version would include enough context to identify which mapping failed and where traversal stopped.
 
 ## Stable Names for Moving Paths
 
@@ -249,9 +249,9 @@ A configured lens is the mechanism that resolves the token against a runtime obj
 - the configured path does not exist on the current object,
 - the resolved value has the wrong runtime type.
 
-Configurable systems should treat these as expected failure modes. Return `Err`, log the token and path, and validate the mapping against fixtures before deployment.
+Configurable systems should treat these as expected failure modes. Return `Err` and log the token and path. Validate the mapping against fixtures before deployment.
 
-The [companion formula example](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts) is intentionally small. Formulas ask for tokens, lenses resolve those tokens, and callers receive typed success or failure.
+The [companion formula example](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts) is intentionally small. Formulas ask for tokens. Lenses resolve those tokens, and callers receive typed success or failure.
 
 ## Mapping Configuration as a Contract
 
@@ -259,7 +259,7 @@ Typed lenses live inside a module. Runtime-configured lenses cross between syste
 
 Token mappings should have a clear owner because they are part of the public contract between the domain model and the systems that consume it. A change to the underlying object shape can break consumers without changing a single formula. At that point, lens configuration should be owned by a specific team and validated before deployment.
 
-During a schema migration, `IRS.Notional` might move from `notionalAmount` to `trade.economics.notional.amount`. Formulas keep referencing `IRS.Notional`; only the mapping changes. A validation job should load representative v2 fixtures, resolve the token, and fail the deployment if the old path is still configured or the result is not a number. Without that check, the abstraction has only moved a property access bug into configuration.
+During a schema migration, `IRS.Notional` might move from `notionalAmount` to `trade.economics.notional.amount`. Formulas keep referencing `IRS.Notional`; only the mapping changes. A validation job should load representative v2 fixtures and resolve the token. It should fail the deployment if the old path is still configured or the result is not a number. Without that check, the abstraction has only moved a property access bug into configuration.
 
 A production setup should make a few things explicit:
 
@@ -274,23 +274,17 @@ The error context matters. `Could not resolve IRS.Notional` is better than `Cann
 
 Lenses create a place to attach ownership and compatibility checks to paths that already mattered but were previously scattered through the codebase.
 
-## Prisms, Traversals, and Libraries
+## Other Optics and Libraries
 
 Classical lenses assume the path always exists and points to a single value. This article's `Result`-returning lenses make failure explicit, but optional fields and discriminated unions still need more precise optics. Collections need their own treatment too.
 
 A discriminated union like `Rate` needs conditional access. The `spread` exists only when the rate is floating. **Prisms** focus on one possible variant of a larger type.
 
-Arrays and collections need a different abstraction. Updating every leg, cashflow, or matching row is what **traversals** are for.
+Arrays and collections need a different abstraction. Updating every matching item is what **traversals** are for.
 
 Implementing all of these from scratch is rarely worth it. For production-grade optics in TypeScript, [`monocle-ts`](https://gcanti.github.io/monocle-ts/) is the reference implementation. For path-based access with weaker type guarantees, Ramda's [`lensPath`](https://ramdajs.com/docs/#lensPath) may be sufficient.
 
-A practical decision table:
-
-- object spread for shallow one-off updates,
-- named lenses for repeated nested immutable access,
-- prisms when the target may not exist because of the shape of the type,
-- traversals when there may be many targets,
-- a library when optics become central to the system.
+A practical cutoff is useful. Use object spread for shallow one-off updates. Use named lenses for repeated nested immutable access. Reach for prisms when the target may not exist because of the shape of the type, and use traversals when there may be many targets. If optics become central to the system, use a library.
 
 Use the smallest abstraction that removes duplicated path logic and makes correctness easier to check.
 
@@ -300,7 +294,7 @@ Pick one domain object with repeated nested updates. Replace the duplicated obje
 
 Use runtime configuration only when the path has to cross a boundary, such as formula definitions, client mappings, reporting metadata, or import specifications. Keep ordinary application code on typed lenses where possible.
 
-Runtime configuration weakens type guarantees. Optional fields and unions need prisms, and generated lenses need validation against representative fixtures. These costs are bounded and usually smaller than the cost of debugging silent mutation across a large codebase. Adopt the pattern when duplicated path knowledge is already creating review risk or schema migration risk. Leave it alone when the update is local and shallow.
+Runtime configuration weakens type guarantees. Optional fields and unions need prisms. Generated lenses need validation against representative fixtures. These costs are bounded and usually smaller than the cost of debugging silent mutation across a large codebase. Adopt the pattern when duplicated path knowledge is already creating review risk or schema migration risk. Leave it alone when the update is local and shallow.
 
 A senior reviewer will object less to the unfamiliar pattern than to hidden failure. Make the failure mode visible and the abstraction becomes easier to defend.
 
