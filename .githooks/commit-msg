@@ -1,0 +1,42 @@
+#!/usr/bin/env sh
+set -eu
+
+commit_msg_file="$1"
+subject="$(sed -n '1p' "$commit_msg_file")"
+
+# Let Git-generated and autosquash commit messages through.
+case "$subject" in
+  Merge\ *|Revert\ *|fixup!*|squash!*)
+    exit 0
+    ;;
+esac
+
+allowed_types="content|playground|site|deps|fix|chore"
+pattern="^(${allowed_types}): [a-z0-9].{5,72}$"
+
+if printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+Invalid commit message subject:
+  $subject
+
+Use: <type>: <imperative summary>
+
+Allowed types:
+  content, playground, site, deps, fix, chore
+
+Examples:
+  content: tighten data access article prose
+  playground: clarify lenses demo output
+  site: allow direct access to draft article URLs
+  deps: add npm lockfile for stackblitz playground
+
+Rules:
+  - summary starts lowercase or with a digit
+  - subject length after "type: " is 6-73 characters
+  - merge, revert, fixup!, and squash! commits are allowed
+EOF
+
+exit 1
