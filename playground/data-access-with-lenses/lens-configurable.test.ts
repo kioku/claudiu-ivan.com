@@ -15,6 +15,10 @@ function buildLens<S extends object, A>(config: LensConfig): Lens<S, A> {
   return result.value;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 describe("createLensFromConfig", () => {
   const sampleObject = {
     a: 1,
@@ -206,29 +210,14 @@ describe("createLensFromConfig", () => {
     const arbPathForObject = (
       obj: object
     ): fc.Arbitrary<(string | number)[]> => {
-      const paths: (string | number)[][] = [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      function collectPaths(currentObj: any, currentPath: (string | number)[]) {
-        if (typeof currentObj !== "object" || currentObj === null) return;
-        for (const key in currentObj) {
-          if (Object.prototype.hasOwnProperty.call(currentObj, key)) {
-            paths.push([...currentPath, key]);
-            if (
-              typeof currentObj[key] === "object" &&
-              !Array.isArray(currentObj[key])
-            ) {
-              for (const subKey in currentObj[key]) {
-                if (
-                  Object.prototype.hasOwnProperty.call(currentObj[key], subKey)
-                ) {
-                  paths.push([...currentPath, key, subKey]);
-                }
-              }
-            }
-          }
-        }
-      }
-      collectPaths(obj, []);
+      const paths: (string | number)[][] = Object.entries(obj).flatMap(
+        ([key, value]) => [
+          [key],
+          ...(isRecord(value)
+            ? Object.keys(value).map((subKey) => [key, subKey])
+            : []),
+        ]
+      );
       return paths.length > 0 ? fc.constantFrom(...paths) : fc.constant([]);
     };
 

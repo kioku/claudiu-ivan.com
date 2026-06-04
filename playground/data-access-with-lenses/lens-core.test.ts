@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
 import { ok, err, isOk, isErr } from "../result-option-types/index.ts";
-import { lensProp, composeLens } from "./lens-core";
+import { lensProp, composeLens, type Lens } from "./lens-core";
 
 describe("lensProp", () => {
   it("views a property as Ok", () => {
@@ -23,8 +23,7 @@ describe("lensProp", () => {
 
   it("returns Err when the property does not exist on view", () => {
     const obj = { a: 1 };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lensB = lensProp<any, "b">("b");
+    const lensB = lensProp<Record<string, unknown>, "b">("b");
     const result = lensB.view(obj);
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
@@ -33,10 +32,13 @@ describe("lensProp", () => {
   });
 
   it("returns Err when the source is null or undefined on view", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lensA = lensProp<any, "a">("a");
-    expect(isErr(lensA.view(null))).toBe(true);
-    expect(isErr(lensA.view(undefined))).toBe(true);
+    const lensA = lensProp<Record<string, unknown>, "a">("a");
+    expect(isErr(lensA.view(null as unknown as Record<string, unknown>))).toBe(
+      true
+    );
+    expect(
+      isErr(lensA.view(undefined as unknown as Record<string, unknown>))
+    ).toBe(true);
   });
 
   describe("Lens Laws (Property-Based)", () => {
@@ -52,8 +54,7 @@ describe("lensProp", () => {
           fc.string({ minLength: 1, maxLength: 10 }),
           (s, key) => {
             s[key] = "default";
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const l = lensProp<any, typeof key>(key);
+            const l = lensProp<Record<string, unknown>, string>(key);
             const viewResult = l.view(s);
             if (isOk(viewResult)) {
               const setResult = l.set(s, viewResult.value);
@@ -74,8 +75,7 @@ describe("lensProp", () => {
           fc.string({ minLength: 1, maxLength: 10 }),
           fc.oneof(fc.integer(), fc.string(), fc.boolean()),
           (s, key, val) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const l = lensProp<any, typeof key>(key);
+            const l = lensProp<Record<string, unknown>, string>(key);
             const setResult = l.set(s, val);
             expect(isOk(setResult)).toBe(true);
             if (isOk(setResult)) {
@@ -94,8 +94,7 @@ describe("lensProp", () => {
           fc.oneof(fc.integer(), fc.string(), fc.boolean()),
           fc.oneof(fc.integer(), fc.string(), fc.boolean()),
           (s, key, v1, v2) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const l = lensProp<any, typeof key>(key);
+            const l = lensProp<Record<string, unknown>, string>(key);
             const first = l.set(s, v1);
             expect(isOk(first)).toBe(true);
             if (isOk(first)) {
@@ -141,8 +140,9 @@ describe("composeLens", () => {
   });
 
   it("propagates view Err from the outer lens", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const badLensA = lensProp<any, "x">("x");
+    const badLensA = lensProp<Record<string, unknown>, "x">(
+      "x"
+    ) as unknown as Lens<State, Outer>;
     const composed = composeLens(badLensA, lensB);
     const result = composed.view(state);
     expect(isErr(result)).toBe(true);
@@ -152,8 +152,9 @@ describe("composeLens", () => {
   });
 
   it("propagates view Err from the inner lens", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const badLensC = lensProp<Inner, any>("z");
+    const badLensC = lensProp<Record<string, unknown>, "z">(
+      "z"
+    ) as unknown as Lens<Inner, number>;
     const composed = composeLens(lensAB, badLensC);
     const result = composed.view(state);
     expect(isErr(result)).toBe(true);
@@ -163,8 +164,9 @@ describe("composeLens", () => {
   });
 
   it("returns Err on set when the outer view fails (no throw)", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const badLensA = lensProp<any, "x">("x");
+    const badLensA = lensProp<Record<string, unknown>, "x">(
+      "x"
+    ) as unknown as Lens<State, Outer>;
     const composed = composeLens(badLensA, lensB);
     const result = composed.set(state, { c: 1 });
     expect(result).toEqual(err("Property 'x' not found on source object."));
