@@ -102,14 +102,14 @@ interface Lens<S, A> {
 
 A lens from `IRS` to `Leg` can focus on the floating leg. A lens from `Leg` to `Rate` can focus on the rate. Composing them gives a lens from `IRS` directly to the floating leg's rate.
 
-The smallest useful building block is [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L23), which focuses on a single property:
+For the floating-rate example, each segment of the path gets its own [`lensProp`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L23):
 
 ```typescript
 const floatingLegLens = lensProp<IRS, "floatingLeg">("floatingLeg");
 const rateLens = lensProp<Leg, "rate">("rate");
 ```
 
-The implementation is small. [`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L41) extends its reach:
+[`composeLens`](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/lens-core.ts#L41) turns those segments into a direct focus on the nested rate:
 
 ```typescript
 const floatingRateLens = composeLens(floatingLegLens, rateLens);
