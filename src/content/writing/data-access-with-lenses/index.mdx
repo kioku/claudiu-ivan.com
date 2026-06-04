@@ -9,7 +9,7 @@ import Annotation from "@/components/Annotation.astro";
 
 Updating a field several levels into a nested immutable object means copying the path above the target and rebuilding the enclosing object by hand. If any intermediate spread is missing, the returned object shares a reference with the original at that level, and a later update will mutate both copies. The compiler does not detect this, and code review finds it inconsistently.
 
-In financial systems this shows up constantly. Interest rate products and valuation contexts are often nested several levels deep. The same pattern appears in claims systems, logistics tools, and product catalogs. Real business rules usually produce nested object shapes.
+In financial systems this shows up constantly. Interest rate products and valuation contexts are often nested several levels deep. The same problem appears in other domains where business rules produce nested object shapes.
 
 Immutability helps because it makes state changes predictable, but it has a practical cost: updating nested data can become noisy enough that the intent disappears.
 
@@ -18,7 +18,7 @@ Path duplication is a second cost. When a field path is used outside the module 
 **Lenses** are a functional programming idea for focusing on part of a larger structure. In TypeScript, they give shared paths a name and move fragile object-copying code behind a testable interface. A previous article on [type-safe error handling](/writing/type-safe-error-handling) argued that absence and failure deserve representation in the type system. Lenses extend the same idea to data access paths.
 
 <Annotation>
-[Try it in StackBlitz ->](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground). The companion code includes typed lenses, runtime-configured lenses, property tests, and a small token-consuming example. You can step through the modules, run the tests, and modify the examples to see how the type system and runtime checks respond.
+[Try it in StackBlitz ->](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground). The companion code pairs the lens implementations with property tests and a small token-consuming example. You can step through the modules, run the tests, and modify the examples to see how the type system and runtime checks respond.
 </Annotation>
 
 ## The Problem
@@ -170,7 +170,7 @@ So far every focused path is chosen at compile time. Real systems often need pat
 
 ## Runtime-Configured Lenses
 
-Runtime configuration is useful when a path has to cross a system boundary. Formula engines are the clearest example: formulas should depend on stable tokens such as `IRS.Notional`, not on the current object shape. Configuration maps each token to a concrete path, and a lens walks that path.
+Runtime configuration is useful when a path has to cross a system boundary. Formula engines are the clearest example: formulas can use stable tokens such as `IRS.Notional` while configuration maps each token to a concrete path. A lens walks that path.
 
 A minimal configuration needs source and target types plus a path:
 
@@ -246,7 +246,7 @@ During a schema migration, `IRS.Notional` might move from `notionalAmount` to `t
 
 A production setup makes ownership and compatibility explicit. Each token namespace needs an owner. Each mapping targets a known schema version. Representative fixtures prove that the configured path still resolves. The team also has to decide whether failures block deployment or surface at request time.
 
-The failure has to point back to the mapping. `Could not resolve IRS.Notional` is better than `Cannot read property amount of undefined`, but the useful version includes the token, configured path, and expected type.
+The failure has to point back to the mapping. `Could not resolve IRS.Notional` is better than `Cannot read property amount of undefined`, but the useful version identifies the failed mapping, including its configured path and expected type.
 
 Lenses create a place to attach ownership and compatibility checks to paths that already mattered but were previously scattered through the codebase.
 
@@ -266,7 +266,7 @@ Lenses are useful when path knowledge is already duplicated across a codebase. T
 
 Runtime configuration is a narrower case. It is useful when paths cross a boundary, such as formula definitions or client mappings, but it weakens type guarantees and needs validation against representative fixtures.
 
-The value is in making an existing dependency explicit. When several parts of a system already rely on the same nested path, a lens turns that path into something that can be named, reviewed, and tested.
+The value is in making an existing dependency explicit. When several parts of a system already rely on the same nested path, a lens gives that path a name and a test surface.
 
 ## References
 
