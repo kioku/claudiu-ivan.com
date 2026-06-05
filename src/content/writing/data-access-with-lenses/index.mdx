@@ -7,7 +7,7 @@ draft: false
 
 import Annotation from "@/components/Annotation.astro";
 
-Updating a field several levels into a nested immutable object means copying the path above the target and rebuilding the enclosing object by hand. If any intermediate spread is missing, the returned object shares a reference with the original at that level, and a later update will mutate both copies. The compiler does not detect this, and code review finds it inconsistently.
+Updating a field several levels into a nested immutable object means copying the path above the target and rebuilding the enclosing object by hand. If an intermediate copy is missing, the returned object may still share a nested reference with the original. A later mutation through that shared reference can affect both copies. In TypeScript, this kind of accidental reference sharing usually passes the compiler, and code review catches it inconsistently.
 
 In financial systems this shows up constantly. Interest rate products and valuation contexts are often nested several levels deep. The same problem appears in other domains where business rules produce nested object shapes.
 
@@ -15,7 +15,7 @@ Immutability helps because it makes state changes predictable, but it has a prac
 
 Path duplication is a second cost. When a field path is used outside the module that owns the domain model, it stops being an implementation detail and becomes part of a broader contract. Repeating that contract as raw property access makes schema changes harder to review and harder to test.
 
-**Lenses** are a functional programming idea for focusing on part of a larger structure. In TypeScript, they give shared paths a name and move fragile object-copying code behind a testable interface. A previous article on [type-safe error handling](/writing/type-safe-error-handling) argued that absence and failure deserve representation in the type system. Lenses extend the same idea to data access paths.
+A **lens** is a functional programming abstraction for reading and immutably updating one focused part of a larger structure. In TypeScript, lenses give shared paths a name and move fragile object-copying code behind a testable interface. A previous article on [type-safe error handling](/writing/type-safe-error-handling) argued that absence and failure deserve representation in the type system. Lenses extend the same idea to data access paths.
 
 <Annotation>
 [Try it in StackBlitz ->](https://stackblitz.com/github/kioku/claudiu-ivan.com/tree/main/playground). The companion code pairs the lens implementations with property tests and a small token-consuming example. You can step through the modules, run the tests, and modify the examples to see how the type system and runtime checks respond.
@@ -165,7 +165,6 @@ The laws make good tests because they are easy to state and easy to violate. A b
 
 Typed property lenses satisfy the laws for well-typed objects by construction. Generated lenses are the more important case to test. If `set` creates intermediate objects, widens arrays, or skips a runtime type check, viewing after setting may not return the value that was set. The same laws should run against representative fixtures and production-like configuration before deployment.
 
-
 So far every focused path is chosen at compile time. Real systems often need paths that come from configuration, and that boundary changes what the type system can prove.
 
 ## Runtime-Configured Lenses
@@ -196,7 +195,7 @@ function createLensFromConfig<S extends object, A>(
 ): Result<Lens<S, A>, string>;
 ```
 
-The same `Result` channel that is mostly ceremony for typed paths becomes necessary once paths come from configuration. At that boundary, lookup can fail even when the TypeScript types compile.
+With typed paths, `Result` mostly documents an unlikely failure. With configured paths, it carries real lookup failures. At that boundary, lookup can fail even when the TypeScript types compile.
 
 Generated lenses lose some of the guarantees that made the hand-written version attractive. A string path is not type-safe. TypeScript cannot prove that `["floatingLeg", "rate", "spread"]` is a valid path for `IRS`, that the value at the end is a number, or that the rate is in the `Floating` variant by the time it is reached. The moment you move access paths into runtime configuration, you move some failures from compile time to runtime.
 
@@ -230,11 +229,11 @@ const notionalConfigV2: LensConfig = {
 };
 ```
 
-A configured lens is the mechanism that resolves the token against a runtime object. It can fail because the token has no configuration, the configuration is malformed, the configured path does not exist on the current object, or the resolved value has the wrong runtime type.
+A configured lens is the mechanism that resolves the token against a runtime object. It can fail because the token has no configuration, the configuration is malformed, or the configured path does not exist on the current object. A production version should also fail when the resolved value has the wrong runtime type.
 
 Configurable systems treat these as expected failure modes. Return `Err` and log the token and path. Validate the mapping against fixtures before deployment.
 
-The [companion formula example](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts) is intentionally small. Formulas ask for tokens. Lenses resolve those tokens, and callers receive typed success or failure.
+The [formula example](https://github.com/kioku/claudiu-ivan.com/blob/20a35cf396d3c7216a577cae3846d03fc3b12e3b/playground/data-access-with-lenses/formula-engine.ts) is intentionally small. Formulas ask for tokens. Lenses resolve those tokens, and callers receive typed success or failure.
 
 ## Token Mappings as a Contract
 
