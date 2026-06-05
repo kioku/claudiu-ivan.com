@@ -12,7 +12,7 @@ export const AUTHOR = {
   NAME: "Claudiu Ivan",
   JOB_TITLE: "Principal System Architect",
   DESCRIPTION:
-    "Principal System Architect specializing in type-driven development, distributed systems, and deterministic architecture. Founder of Software Foundry, providing architectural consulting for data-intensive platforms.",
+    "Principal System Architect focused on type-driven development, distributed systems, software architecture, and data-intensive applications. Founder of Software Foundry.",
   EXPERTISE: [
     "System Architecture",
     "Distributed Systems",
@@ -28,13 +28,13 @@ export const SOFTWARE_FOUNDRY = {
   NAME: "Software Foundry",
   URL: "https://www.softwarefoundry.ch",
   DESCRIPTION:
-    "Architectural consulting practice specializing in mission-critical platform development for organizations building data-intensive systems.",
+    "Architectural consulting practice for organizations building data-intensive software systems.",
 };
 
 export const HOME: Metadata = {
   TITLE: "Principal System Architect",
   DESCRIPTION:
-    "Claudiu Ivan is a Principal System Architect specializing in type-driven development and distributed systems. Founder of Software Foundry, providing architectural consulting for data-intensive platforms.",
+    "Claudiu Ivan is a Principal System Architect writing about type-driven development, distributed systems, software architecture, and data-intensive applications.",
 };
 
 export const BLOG: Metadata = {
