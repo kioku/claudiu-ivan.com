@@ -1,4 +1,3 @@
-import { enableMapSet } from "immer";
 import { err, isErr, isOk, ok } from "../result-option-types/index.ts";
 import {
   type IRS,
@@ -19,8 +18,6 @@ import {
 const section = (title: string): void => {
   console.log(`\n--- ${title} ---`);
 };
-
-enableMapSet();
 
 // --- Example Data Setup ---
 const sampleIRS: IRS = {
